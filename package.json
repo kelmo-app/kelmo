@@ -1,0 +1,155 @@
+{
+  "name": "kelmo",
+  "productName": "KELMO",
+  "version": "0.9.0",
+  "description": "KELMO — The Open Download Workspace. An open-source GPLv3 download manager for Windows and Linux.",
+  "author": "KELMO Contributors",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron -c cyan,yellow \"vite --host 127.0.0.1\" \"wait-on tcp:127.0.0.1:5173 && cross-env KELMO_DEV=1 electron .\"",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "package": "npm run build && electron-builder --linux --win",
+    "package:linux": "npm run build && electron-builder --linux AppImage dir && bash scripts/make-rpm.sh && (bash scripts/make-deb.sh || echo \"(.deb skipped: sudo dnf install dpkg, then npm run package:deb)\")",
+    "package:win": "npm run build && electron-builder --win",
+    "dev:nosandbox": "concurrently -k -n vite,electron -c cyan,yellow \"vite --host 127.0.0.1\" \"wait-on tcp:127.0.0.1:5173 && cross-env KELMO_DEV=1 electron . --no-sandbox\"",
+    "test:engine": "node --test engine/test/download.test.mjs engine/test/host.test.mjs engine/test/http.test.mjs engine/test/hash.test.mjs engine/test/hls.test.mjs engine/test/ytdlp.test.mjs engine/test/torrent.test.mjs",
+    "package:ext": "node scripts/pack-extension.mjs",
+    "package:deb": "npm run build && electron-builder --linux dir && bash scripts/make-deb.sh",
+    "package:rpm": "npm run build && electron-builder --linux dir && bash scripts/make-rpm.sh",
+    "dev:nogpu": "concurrently -k -n vite,electron -c cyan,yellow \"vite --host 127.0.0.1\" \"wait-on tcp:127.0.0.1:5173 && cross-env KELMO_DEV=1 electron . --no-sandbox --disable-gpu\"",
+    "test:live": "tsx scripts/live-e2e.mts",
+    "test:bridge": "node --test electron/test/bridge.test.mjs electron/test/extension.test.mjs electron/test/popups.test.mjs electron/test/power.test.mjs electron/test/media.test.mjs electron/test/secrets.test.mjs electron/test/clipboard.test.mjs electron/test/contextmenu.test.mjs electron/test/diaglog.test.mjs electron/test/native.test.mjs"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.15.0",
+    "uint8-util": "2.2.5",
+    "webtorrent": "~2.5.19",
+    "zustand": "^4.5.5"
+  },
+  "overrides": {
+    "uint8-util": "2.2.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "org.kelmo.app",
+    "productName": "KELMO",
+    "copyright": "Copyright © KELMO Contributors. Released under the GPLv3 license.",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "build/icon.png",
+      "build/tray.png",
+      "build/tray-*.png",
+      "electron/**/*",
+      "engine/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KDM"
+    },
+    "linux": {
+      "mimeTypes": [
+        "application/x-bittorrent",
+        "x-scheme-handler/magnet"
+      ],
+      "target": [
+        "AppImage",
+        "rpm",
+        "deb"
+      ],
+      "category": "Network",
+      "icon": "build/icon.png",
+      "maintainer": "KELMO Contributors <hello@kelmo.dev>",
+      "synopsis": "KDM — Kelmo Download Manager",
+      "description": "KDM is an open-source GPLv3 download manager with queues, scheduling, browser integration and video capture.",
+      "desktop": {
+        "Name": "KDM",
+        "GenericName": "Download Manager",
+        "StartupWMClass": "KELMO"
+      }
+    },
+    "asarUnpack": [
+      "engine/**/*"
+    ],
+    "artifactName": "KDM-${version}-${arch}.${ext}",
+    "rpm": {
+      "packageName": "kdm"
+    },
+    "deb": {
+      "packageName": "kdm"
+    },
+    "extraResources": [
+      {
+        "from": "extension",
+        "to": "extension",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}

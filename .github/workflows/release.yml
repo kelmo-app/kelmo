@@ -1,0 +1,41 @@
+# Builds the Windows installer and the Linux packages on GitHub's own machines.
+# Run it from the Actions tab ("Run workflow"), or push a tag like v0.9.0.
+name: Release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - run: npm run test:engine
+      - run: npm run test:bridge
+      - name: Tools for the Linux packages (rpmbuild)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: npm run package:linux
+      - name: Browser extension zips (Firefox + Chromium)
+        if: runner.os == 'Linux'
+        run: npm run package:ext
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: npm run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kdm-${{ runner.os }}
+          path: |
+            release/*.exe
+            release/*.AppImage
+            release/*.rpm
+            release/*.deb
+            release/kdm-*.zip

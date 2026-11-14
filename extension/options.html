@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>KDM options</title>
+<style>
+  body{font:15px/1.5 system-ui,sans-serif;max-width:560px;margin:40px auto;padding:0 20px;color:#0f172a}
+  h1{font-size:22px;margin:0 0 4px} p{color:#475569} label{display:block;margin:18px 0 6px;font-weight:600}
+  input[type=text]{width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;font:14px ui-monospace,monospace}
+  button{margin-top:14px;padding:9px 16px;border:0;border-radius:8px;background:#0891b2;color:#fff;font-weight:600;cursor:pointer}
+  #status{margin-top:18px;padding:10px 12px;border-radius:8px;background:#f1f5f9}
+  .ok{background:#dcfce7!important}.warn{background:#fef3c7!important}
+</style></head>
+<body>
+  <h1>KDM — Kelmo Download Manager</h1>
+  <p>KDM pairs this extension by itself once KDM has been started (restart the browser if it was open before KDM was installed). Only if the status below says it is not paired, paste the token from KDM → Settings → Advanced → Browser integration.</p>
+  <label for="token">Pairing token (manual, only if needed)</label>
+  <input id="token" type="text" autocomplete="off" spellcheck="false" placeholder="32-character token">
+  <label><input id="enabled" type="checkbox"> Send browser downloads to KDM</label>
+  <button id="save">Save</button>
+  <div id="status">Checking…</div>
+  <script src="options.js"></script>
+</body></html>

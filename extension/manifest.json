@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "KDM — Kelmo Download Manager",
+  "version": "0.7.0",
+  "description": "Sends your browser downloads and videos to KDM, the open download workspace.",
+  "permissions": [
+    "downloads",
+    "storage",
+    "contextMenus",
+    "cookies",
+    "webRequest",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": [
+      "media.js",
+      "background.js"
+    ]
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "KDM",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "kdm@kelmo.dev",
+      "strict_min_version": "121.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6RNsjmLpVc0HugkuGyl9Eco4JgyDqfPUZDylzDkZWTx/7Pygs7GKZuBvBRYYJIECts0Rbc+psqCmEmdpd3veDcGuqIzCokcfVYpsISvGQwCuRDTrT6i5MBtxhktYZLP+2bZE5fQANFrk1AOdzBvffYArJhJ4+uvhLKP5+cs0eYPr7i3f7sODtJaBPW1PXNmxXLee1SMxtQGHumy6IxXkR0fnzVtaA6IBZMzggnmudZlRVFkk0Ubo2hyefalIen2QIVtkymqn9HsnHpwsHxNdnTtLKSVk0BJAhHHuKKsZrwlNi17gram++tmMmsiiypM1nzpmVF37YvKJJ8ViEarM+QIDAQAB"
+}
