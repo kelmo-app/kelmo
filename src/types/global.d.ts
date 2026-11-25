@@ -24,6 +24,7 @@ declare global {
       isElectron: true;
       openPath: (path: string) => Promise<{ ok: boolean; error?: string }>;
       showInFolder: (path: string) => Promise<{ ok: boolean }>;
+      trashFiles: (entries: Array<{ dir: string; name: string }>) => Promise<{ trashed: number; missing: number; failed: string[] }>;
       pickFolder: () => Promise<string | null>;
       pickTorrent: () => Promise<string | null>;
       clipboardLink: () => Promise<string>;
@@ -63,6 +64,7 @@ declare global {
         action: (msg: { id: string; action: 'pause' | 'resume' | 'cancel' | 'limit' | 'after' | 'afterAll'; value?: number | string }) => Promise<boolean>;
         pref: (msg: { key: 'showCompleteDialog' | 'showProgressWindow' | 'dropTarget'; value: boolean }) => Promise<boolean>;
         rememberFolder: (msg: { category: string; folder: string }) => Promise<boolean>;
+        diskInfo: (dir: string) => Promise<{ total: number; free: number } | null>;
         open: (msg: { id: string; what: 'file' | 'folder' }) => Promise<{ ok: boolean; error?: string }>;
         pickFolder: () => Promise<string | null>;
         pickTorrent: () => Promise<string | null>;
@@ -100,9 +102,17 @@ export interface PopupConfig {
   watchClipboard: boolean;
   /** Show the small floating drop target. */
   dropTarget: boolean;
+  /** Unfinished downloads (partly downloaded): a new link for the same file can continue one of them. */
+  unfinished?: UnfinishedItem[];
+  /** The download waiting for a new address (the person asked for one). */
+  waitingId?: string | null;
 }
 
+export interface UnfinishedItem { id: string; fileName: string; totalBytes: number; downloadedBytes: number; status: string }
+
 export interface PopupAddSpec {
+  /** Continue this existing download under the new address instead of adding a new one. */
+  replaceId?: string;
   url: string;
   fileName: string;
   dir: string;
@@ -124,6 +134,8 @@ export interface PopupItem {
   id: string;
   url: string;
   fileName: string;
+  /** Torrents: the biggest file inside the folder, used to pick the right icon/label. */
+  mainFile?: string;
   destination: string;
   status: string;
   totalBytes: number;

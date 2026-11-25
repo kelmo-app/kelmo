@@ -16,15 +16,15 @@ export function computeQueueStats(queue: Queue, items: Record<string, DownloadIt
       case 'downloading':
         stats.active += 1;
         stats.speed += it.speed;
-        stats.remainingBytes += it.totalBytes - it.downloadedBytes;
+        stats.remainingBytes += Math.max(0, it.totalBytes - it.downloadedBytes);
         break;
       case 'queued':
         stats.queued += 1;
-        stats.remainingBytes += it.totalBytes - it.downloadedBytes;
+        stats.remainingBytes += Math.max(0, it.totalBytes - it.downloadedBytes);
         break;
       case 'paused':
         stats.paused += 1;
-        stats.remainingBytes += it.totalBytes - it.downloadedBytes;
+        stats.remainingBytes += Math.max(0, it.totalBytes - it.downloadedBytes);
         break;
       case 'completed':
         stats.completed += 1;

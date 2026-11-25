@@ -15,6 +15,7 @@ export interface DownloadStoreState {
   resume: (id: string) => void;
   cancel: (id: string) => void;
   retry: (id: string) => void;
+  replaceLink: (id: string, link: { url: string; referrer?: string; cookie?: string; userAgent?: string }) => boolean;
   remove: (id: string) => void;
   removeMany: (ids: string[]) => void;
   pauseMany: (ids: string[]) => void;
@@ -57,6 +58,7 @@ export function createDownloadStore(manager: DownloadManager) {
       resume: (id) => void manager.resume(id),
       cancel: (id) => void manager.cancel(id),
       retry: (id) => void manager.retry(id),
+      replaceLink: (id, link) => manager.replaceLink(id, link),
       remove: (id) => void manager.remove(id),
       removeMany: (ids) => void manager.removeMany(ids),
       pauseMany: (ids) => void manager.pauseMany(ids),

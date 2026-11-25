@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoryOfName, folderFor, fullPath, percentOf, popupItems, progressRows, pushHistory, segmentBar, sparkPoints, statusText, windowTitle } from './popupLogic';
+import { categoryOfName, findUnfinishedMatch, folderFor, fullPath, percentOf, popupItems, progressRows, pushHistory, segmentBar, sparkPoints, statusText, windowTitle } from './popupLogic';
 import { categoryFolder, classifyFile, normalizeCategory } from '@/lib/url';
 import type { DownloadItem } from '@/types';
 import type { PopupItem } from '@/types/global';
@@ -7,6 +7,26 @@ import type { PopupItem } from '@/types/global';
 const item = (o: Partial<PopupItem> = {}): PopupItem => ({
   id: 'd1', url: 'https://x.test/a.zip', fileName: 'a.zip', destination: '~/Downloads/KDM/Compressed', status: 'downloading',
   totalBytes: 1000, downloadedBytes: 250, speed: 100, eta: 7, connections: 4, speedLimit: 0, resumable: true, error: null, afterOpen: 'none', ...o,
+});
+
+describe('findUnfinishedMatch', () => {
+  const list = [
+    { id: 'a', fileName: 'Movie.mkv', totalBytes: 1000, downloadedBytes: 400, status: 'failed' },
+    { id: 'b', fileName: 'Other.zip', totalBytes: 500, downloadedBytes: 100, status: 'paused' },
+  ];
+  it('same name and exactly the same size is the same file', () => {
+    expect(findUnfinishedMatch(list, { fileName: 'movie (1).mkv', size: 1000 })?.item.id).toBe('a');
+  });
+  it('a different size or name is not offered', () => {
+    expect(findUnfinishedMatch(list, { fileName: 'Movie.mkv', size: 999 })).toBeNull();
+    expect(findUnfinishedMatch(list, { fileName: 'Else.mkv', size: 1000 })).toBeNull();
+    expect(findUnfinishedMatch(list, { fileName: 'Movie.mkv', size: 0 })).toBeNull();
+  });
+  it('when the person asked for a new address that download is offered even under another name', () => {
+    expect(findUnfinishedMatch(list, { fileName: 'download', size: 500 }, 'b')).toMatchObject({ waiting: true, item: { id: 'b' } });
+    expect(findUnfinishedMatch(list, { fileName: 'download', size: 777 }, 'b')).toBeNull();
+    expect(findUnfinishedMatch(list, { fileName: 'download', size: 0 }, 'b')?.item.id).toBe('b');
+  });
 });
 
 describe('IDM-style categories', () => {
@@ -29,6 +49,8 @@ describe('IDM-style categories', () => {
     expect(categoryFolder('Video', '~/Downloads/KDM/')).toBe('~/Downloads/KDM/Video');
     expect(categoryFolder('Video', '~/Downloads/KDM', { Video: '/mnt/movies' })).toBe('/mnt/movies');
     expect(categoryFolder('Video', '~/d', { Video: '  ' })).toBe('~/d/Video');
+    expect(categoryFolder('General', '~/Downloads/KDM/')).toBe('~/Downloads/KDM');
+    expect(categoryFolder('General', '~/d', { General: '/x' })).toBe('/x');
   });
   it('popup folder lookup falls back to General', () => {
     const f = [{ name: 'General', folder: '/g' }, { name: 'Music', folder: '/m' }];
@@ -72,6 +94,11 @@ describe('what the small windows get to see', () => {
   it('carries the per-download "after completion" choice', () => {
     const out = popupItems([{ ...base, viaPopup: true }] as DownloadItem[], new Map([['a', 'folder' as const]]));
     expect(out[0].afterOpen).toBe('folder');
+  });
+  it('passes a torrent\'s main file along so the small windows pick the right icon', () => {
+    const out = popupItems([{ ...base, viaPopup: true, mainFile: 'Office/Office.rar' }, { ...base, id: 'b', viaPopup: true }] as DownloadItem[], new Map());
+    expect(out[0].mainFile).toBe('Office/Office.rar');
+    expect('mainFile' in out[1]).toBe(false);
   });
 });
 

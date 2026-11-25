@@ -59,6 +59,13 @@
     }
   }
 
+  let warmedFor = '';
+  function warm() { // the video button just appeared: let KDM read this page now (background asks only for known video sites)
+    if (warmedFor === location.href) return;
+    warmedFor = location.href;
+    try { api.runtime.sendMessage({ type: 'prewarm' }).catch(() => {}); } catch { /* extension reloaded */ }
+  }
+
   function place(v) {
     const r = v.getBoundingClientRect();
     const x = Math.min(Math.max(r.left + 8, 4), window.innerWidth - 190);
@@ -66,6 +73,7 @@
     host.style.left = `${x}px`;
     host.style.top = `${y}px`;
     host.style.display = 'block';
+    warm();
   }
 
   function hide() {

@@ -7,6 +7,7 @@
  * the latest progress event. Bytes never move through this class.
  */
 import type { DownloadItem } from '../types/index.ts';
+import { fileNameFromUrl } from '../lib/url.ts';
 import type { DownloadEngine, EngineAdvance, EngineConfig, EngineContext, VerifyResult } from './DownloadEngine.ts';
 
 export interface EngineEvent {
@@ -21,10 +22,12 @@ export interface EngineEvent {
   error?: string | null;
   fileName?: string | null;
   rangeOk?: boolean;
+  /** Torrents: the biggest file inside the download folder (what "Open" plays). */
+  mainFile?: string;
 }
 
 export interface EngineBridge {
-  start(spec: { id: string; url: string; dir: string; fileName?: string; connections?: number; speedLimit?: number; queueId?: string; queueLimit?: number; authUser?: string; authSecret?: string; retries?: number; headers?: Record<string, string>; mirrors?: string[]; video?: { choice: string; size?: number; useLogin?: boolean } }): Promise<boolean>;
+  start(spec: { id: string; url: string; dir: string; fileName?: string; connections?: number; speedLimit?: number; queueId?: string; queueLimit?: number; authUser?: string; authSecret?: string; retries?: number; headers?: Record<string, string>; mirrors?: string[]; video?: { choice: string; size?: number; useLogin?: boolean }; autoName?: boolean; adopt?: boolean }): Promise<boolean>;
   pause(id: string): Promise<boolean>;
   cancel(id: string, loc?: { dir: string; fileName: string; video?: boolean }): Promise<boolean>;
   setSpeedLimit(id: string, bps: number): Promise<boolean>;
@@ -44,6 +47,7 @@ interface Live {
   error: string | null;
   fileName: string | null;
   rangeOk: boolean | null;
+  mainFile?: string;
 }
 
 /** Request headers that make the engine look like the browser tab the link came from. */
@@ -77,6 +81,7 @@ export class RealDownloadEngine implements DownloadEngine {
       if (e.total) l.total = e.total;
       if (e.fileName) l.fileName = e.fileName;
       if (typeof e.rangeOk === 'boolean') l.rangeOk = e.rangeOk;
+      if (e.mainFile) l.mainFile = e.mainFile;
       if (e.status === 'failed') l.error = e.error || 'Download failed';
     }
   }
@@ -88,7 +93,7 @@ export class RealDownloadEngine implements DownloadEngine {
     l = { downloaded: item.downloadedBytes, total: 0, speed: 0, connections: 0, status: 'starting', error: null, fileName: null, rangeOk: null };
     this.live.set(item.id, l);
     this.bridge
-      .start({ id: item.id, url: item.url, dir: item.destination, fileName: item.fileName, connections: item.connections, speedLimit: item.speedLimit, queueId: item.queueId, queueLimit: this.queueLimits.get(item.queueId) ?? 0, headers: headersFor(item), mirrors: item.mirrors, authUser: item.authUser, authSecret: item.authSecret, video: item.video })
+      .start({ id: item.id, url: item.url, dir: item.destination, fileName: item.fileName, connections: item.connections, speedLimit: item.speedLimit, queueId: item.queueId, queueLimit: this.queueLimits.get(item.queueId) ?? 0, headers: headersFor(item), mirrors: item.mirrors, authUser: item.authUser, authSecret: item.authSecret, video: item.video, adopt: item.adoptLink === true, autoName: !item.video && item.fileName === fileNameFromUrl(item.url) })
       .catch((err: unknown) => {
         const cur = this.live.get(item.id);
         if (cur) {
@@ -103,10 +108,10 @@ export class RealDownloadEngine implements DownloadEngine {
     return this.ensure(item).speed;
   }
 
-  sync(item: DownloadItem): { totalBytes?: number; fileName?: string; connections?: number; resumable?: boolean } | null {
+  sync(item: DownloadItem): { totalBytes?: number; fileName?: string; connections?: number; resumable?: boolean; mainFile?: string } | null {
     const l = this.live.get(item.id);
     if (!l) return null;
-    return { totalBytes: l.total || undefined, fileName: l.fileName || undefined, connections: l.connections || undefined, resumable: l.rangeOk ?? undefined };
+    return { totalBytes: l.total || undefined, fileName: l.fileName || undefined, connections: l.connections || undefined, resumable: l.rangeOk ?? undefined, mainFile: l.mainFile };
   }
 
   advance(item: DownloadItem, _speed: number, _ctx: EngineContext): EngineAdvance {
@@ -117,8 +122,9 @@ export class RealDownloadEngine implements DownloadEngine {
     }
     if (l.status === 'completed') {
       this.live.delete(item.id);
-      // push the manager past its completion threshold
-      return { bytes: Math.max(0, item.totalBytes - item.downloadedBytes) + 1 };
+      // push the manager past its completion threshold (when the size was never known, what arrived is the size)
+      const bytes = item.totalBytes > 0 ? Math.max(0, item.totalBytes - item.downloadedBytes) + 1 : Math.max(0, l.downloaded - item.downloadedBytes);
+      return { bytes, done: true };
     }
     if (l.status === 'paused' || l.status === 'cancelled') {
       // the engine stopped on its own (rare); let the manager see no progress

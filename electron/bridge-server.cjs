@@ -27,7 +27,7 @@ function cleanHeader(v, max) {
   return t || undefined;
 }
 
-function createBridgeServer({ token, version, onAdd }) {
+function createBridgeServer({ token, version, onAdd, onPrewarm }) {
   return http.createServer((req, res) => {
     const origin = req.headers.origin;
     const cors = origin
@@ -69,6 +69,22 @@ function createBridgeServer({ token, version, onAdd }) {
           cookie: cleanHeader(body.cookie, 16 * 1024),
           userAgent: cleanHeader(body.userAgent, 512),
         });
+        send(200, { ok: true });
+      });
+      return;
+    }
+    // The extension says "this video page is about to be downloaded": KDM can read it in the background so the window opens ready.
+    if (req.method === 'POST' && req.url === '/prewarm') {
+      if (!authed) return send(401, { error: 'bad token' });
+      const chunks = [];
+      let size = 0;
+      req.on('data', (c) => { size += c.length; if (size > 8 * 1024) { send(413, { error: 'too large' }); req.destroy(); } else chunks.push(c); });
+      req.on('end', () => {
+        if (res.writableEnded) return;
+        let url;
+        try { url = new URL(String(JSON.parse(Buffer.concat(chunks).toString('utf8')).url)); } catch { return send(400, { error: 'invalid url' }); }
+        if (!/^https?:$/.test(url.protocol) || url.href.length > 4096) return send(400, { error: 'unsupported url' });
+        try { if (onPrewarm) onPrewarm(url.href); } catch { /* never let a warm-up break the bridge */ }
         send(200, { ok: true });
       });
       return;

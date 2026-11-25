@@ -280,7 +280,8 @@ export class DownloadManager {
     if (!queue) throw new Error('Create a queue before adding downloads.');
 
     const h = hash(fileName + url);
-    const totalBytes = Math.round((60 + (h % 2400)) * MB * (auto.fileType === 'iso' ? 1.6 : 1)); // 60 MB … ~3–5 GB
+    // The demo engine invents a size. A real engine never does: the size stays 0 ("unknown") until the server tells it.
+    const totalBytes = typeof this.engine.sync === 'function' ? 0 : Math.round((60 + (h % 2400)) * MB * (auto.fileType === 'iso' ? 1.6 : 1)); // 60 MB … ~3–5 GB
     const connections = clamp(input.connections ?? this.config.defaultConnections, 1, 16);
     const item: DownloadItem = {
       id: uid('d'),
@@ -382,6 +383,21 @@ export class DownloadManager {
       },
       (it) => this.log('paused', `${it.fileName} cancelled`, it.id),
     );
+  }
+
+  /**
+   * "New address" for an expired / broken link: the same file, found again in the browser. Keeps what is already on disk and
+   * carries on from there (the engine checks that the size is the same before it trusts the partial file).
+   */
+  replaceLink(id: string, link: { url: string; referrer?: string; cookie?: string; userAgent?: string }): boolean {
+    const it = this.state.items[id];
+    if (!it || !['failed', 'paused', 'cancelled'].includes(it.status) || !isValidUrl(link.url)) return false;
+    this.patchItem(
+      id,
+      (cur) => ({ ...cur, url: link.url.trim(), referrer: link.referrer, cookie: link.cookie, userAgent: link.userAgent, adoptLink: true, error: null }),
+      (cur) => this.log('resumed', `${cur.fileName}: new address`, cur.id),
+    );
+    return it.status === 'paused' ? this.resume(id) : this.retry(id);
   }
 
   retry(id: string): boolean {
@@ -692,8 +708,11 @@ export class DownloadManager {
         const name = meta.fileName || it.fileName;
         const conns = meta.connections && meta.connections > 0 ? meta.connections : it.connections;
         const resumable = meta.resumable ?? it.resumable;
-        if (total !== it.totalBytes || name !== it.fileName || conns !== it.connections || resumable !== it.resumable) {
+        const main = meta.mainFile && meta.mainFile !== it.mainFile ? meta.mainFile : null;
+        if (main || total !== it.totalBytes || name !== it.fileName || conns !== it.connections || resumable !== it.resumable) {
           const auto = name !== it.fileName ? classifyFile(name) : null;
+          // A torrent is a folder: file it by its biggest file (a movie goes to Video, not General).
+          const byMain = main && this.config.autoCategorize && it.category === 'General' ? classifyFile(main) : null;
           it = {
             ...it,
             totalBytes: total,
@@ -701,6 +720,8 @@ export class DownloadManager {
             connections: conns,
             resumable,
             ...(auto && this.config.autoCategorize ? { fileType: auto.fileType } : {}),
+            ...(main ? { mainFile: main } : {}),
+            ...(byMain ? { fileType: byMain.fileType, category: byMain.category } : {}),
           };
           items[id] = it;
           dirty = true;
@@ -734,10 +755,13 @@ export class DownloadManager {
       }
 
       const downloaded = it.downloadedBytes + res.bytes;
-      if (downloaded >= it.totalBytes - 0.5) {
+      // an unknown size (0) never counts as "reached": only the engine can say it is done
+      if (res.done || (it.totalBytes > 0 && downloaded >= it.totalBytes - 0.5)) {
+        const finalTotal = it.totalBytes > 0 ? it.totalBytes : downloaded;
         const completed: DownloadItem = {
           ...it,
-          downloadedBytes: it.totalBytes,
+          totalBytes: finalTotal,
+          downloadedBytes: finalTotal,
           progress: 100,
           speed: 0,
           eta: null,
@@ -754,13 +778,14 @@ export class DownloadManager {
         newActivity.push(this.log('completed', `${it.fileName} downloaded`, id, now));
       } else {
         totalSpeed += speed;
+        const known = it.totalBytes > 0;
         const remaining = it.totalBytes - downloaded;
         items[id] = {
           ...it,
           downloadedBytes: downloaded,
-          progress: (downloaded / it.totalBytes) * 100,
+          progress: known ? (downloaded / it.totalBytes) * 100 : 0,
           speed,
-          eta: speed > 1 ? remaining / speed : null,
+          eta: known && speed > 1 ? remaining / speed : null,
           durationSec: it.durationSec + dt,
         };
       }

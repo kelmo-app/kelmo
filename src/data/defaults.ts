@@ -1,12 +1,13 @@
 import type { Settings } from '../types/index.ts';
 import { MB } from '../lib/format.ts';
 
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.9.1';
 export const DEFAULT_FOLDER = '~/Downloads/KELMO';
 
 export const defaultSettings: Settings = {
   theme: 'dark',
   accentColor: 'default',
+  palette: 'gold',
   vibrant: true,
   density: 'comfortable',
   reduceMotion: false,

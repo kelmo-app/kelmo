@@ -35,6 +35,19 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
   { id: 'about', label: 'Open Source / GPLv3', icon: Info },
 ];
 
+const PALETTES: Array<{ key: Settings['palette']; label: string; bg: string; fg: string; accent: string }> = [
+  { key: 'gold', label: 'KELMO Gold (default) · light / dark', bg: '#15100d', fg: '#f2ece4', accent: '#f29e34' },
+  { key: 'sand', label: 'Graphite Sand · light / dark', bg: '#21191b', fg: '#f1e5d5', accent: '#cdb38e' },
+  { key: 'navygold', label: 'Navy & Gold · light / dark', bg: '#0d2353', fg: '#f7efe0', accent: '#f0ce84' },
+  { key: 'royal', label: 'Royal Night · light / dark', bg: '#2a0b5a', fg: '#f5effb', accent: '#efd36f' },
+  { key: 'emerald', label: 'Emerald Gold · light / dark', bg: '#08453d', fg: '#f5f0e4', accent: '#e3bd6d' },
+  { key: 'windows', label: 'Windows light · blue', bg: '#f0f2f5', fg: '#1c2028', accent: '#0060d6' },
+  { key: 'ivory', label: 'Warm ivory · teal', bg: '#faf4ea', fg: '#28221c', accent: '#1c7878' },
+  { key: 'slate', label: 'Cool slate · cyan', bg: '#323e4a', fg: '#eef4fa', accent: '#38d6e8' },
+  { key: 'graphite', label: 'Graphite · amber', bg: '#1c1c1e', fg: '#eeeeee', accent: '#f0a046' },
+  { key: 'clean', label: 'Clean white · emerald', bg: '#f4f6f7', fg: '#181e22', accent: '#088c54' },
+];
+
 const ACCENTS: Array<{ key: Settings['accentColor']; label: string; color: string }> = [
   { key: 'default', label: 'Copper', color: 'rgb(214 120 24)' },
   { key: 'cyan', label: 'Ocean', color: 'rgb(20 160 196)' },
@@ -203,7 +216,27 @@ export default function SettingsPage() {
                   ]}
                 />
               </SettingRow>
-              <SettingRow title="Theme" description="Dark, light, or follow your system.">
+              <SettingRow title="Colour scheme" description="KELMO Gold is the default. The five at the front have a Dark and a Light version (see Theme below); the rest are single-look schemes. All of them recolour the popups too.">
+                <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="Colour scheme">
+                  {PALETTES.map((pl) => (
+                    <button
+                      key={pl.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={settings.palette === pl.key}
+                      aria-label={pl.label}
+                      title={pl.label}
+                      onClick={() => update({ palette: pl.key })}
+                      className={`flex h-9 w-12 items-center justify-center gap-1 rounded-md border-2 transition ${settings.palette === pl.key ? 'border-accent scale-105' : 'border-line hover:scale-105'}`}
+                      style={{ background: pl.bg }}
+                    >
+                      <span className="h-3 w-3 rounded-full" style={{ background: pl.accent }} />
+                      <span className="h-3 w-1.5 rounded-sm" style={{ background: pl.fg, opacity: 0.8 }} />
+                    </button>
+                  ))}
+                </div>
+              </SettingRow>
+              <SettingRow title="Theme" description={settings.palette === 'gold' || ['sand', 'navygold', 'royal', 'emerald'].includes(settings.palette) ? 'Dark, light, or follow your system.' : 'This colour scheme has one fixed look. Pick KELMO Gold, Graphite Sand, Navy & Gold, Royal Night or Emerald Gold to use Dark / Light.'}>
                 <Segmented<Settings['theme']>
                   label="Theme"
                   value={settings.theme}

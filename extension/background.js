@@ -5,7 +5,7 @@ if (typeof importScripts === 'function') { try { importScripts('media.js'); } ca
 const M = globalThis.KdmMedia;
 const PORTS = [47631, 47632, 47633, 47634, 47635];
 
-const getSettings = () => api.storage.local.get({ token: '', enabled: true, port: null });
+const getSettings = () => api.storage.local.get({ token: '', enabled: true, port: null, prewarm: true });
 
 async function findPort(preferred) {
   const order = preferred ? [preferred, ...PORTS.filter((p) => p !== preferred)] : PORTS;
@@ -67,6 +67,22 @@ async function sendToKdm(url, extra = {}) {
   }
 }
 
+// Tell KDM "this video page may be downloaded" so its window opens already knowing the formats. Best effort, silent.
+const warmed = new Map();
+async function prewarm(pageUrl) {
+  try {
+    const s = await getSettings();
+    if (!s.enabled || !s.prewarm || !s.token) return;
+    const key = pageUrl.replace(/#.*$/, '');
+    if (Date.now() - (warmed.get(key) || 0) < 5 * 60_000) return;
+    warmed.set(key, Date.now());
+    if (warmed.size > 30) warmed.delete(warmed.keys().next().value);
+    const port = await findPort(s.port);
+    if (!port) return;
+    await fetch(`http://127.0.0.1:${port}/prewarm`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kdm-token': s.token }, body: JSON.stringify({ url: pageUrl }) });
+  } catch { /* never disturb browsing */ }
+}
+
 function badge(text, color) {
   api.action.setBadgeText({ text });
   if (color) api.action.setBadgeBackgroundColor({ color });
@@ -111,9 +127,9 @@ api.runtime.onInstalled.addListener(() => {
   api.contextMenus.create({ id: 'kdm-link', title: 'Download with KDM', contexts: ['link', 'video', 'audio', 'image'] });
   api.contextMenus.create({ id: 'kdm-page', title: 'Download this video with KDM', contexts: ['page'], documentUrlPatterns: VIDEO_SITE_PATTERNS });
 });
-api.contextMenus.onClicked.addListener(async (info) => {
+api.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'kdm-page') {
-    const ok = M && M.isVideoSitePage(info.pageUrl) && (await sendToKdm(info.pageUrl)).ok;
+    const ok = M && M.isVideoSitePage(info.pageUrl) && (await sendToKdm(info.pageUrl, { fileName: M.suggestName(tab && tab.title, info.pageUrl, 'mp4') })).ok;
     badge(ok ? '✓' : '!', ok ? '#16a34a' : '#d97706');
     return;
   }
@@ -215,7 +231,7 @@ if (M && api.webRequest && api.webRequest.onHeadersReceived && api.tabs) {
       return true;
     }
     if (msg.type === 'page-send' && typeof msg.url === 'string' && M.isVideoSitePage(msg.url)) {
-      sendToKdm(msg.url).then(reply, () => reply({ ok: false, reason: 'error' }));
+      sendToKdm(msg.url, { fileName: M.suggestName(sender && sender.tab && sender.tab.title, msg.url, 'mp4') }).then(reply, () => reply({ ok: false, reason: 'error' }));
       return true;
     }
     if (msg.type === 'media-send' && typeof msg.url === 'string' && typeof msg.tabId === 'number') {
@@ -225,10 +241,14 @@ if (M && api.webRequest && api.webRequest.onHeadersReceived && api.tabs) {
       })().then(reply, () => reply({ ok: false, reason: 'error' }));
       return true;
     }
+    if (msg.type === 'prewarm' && sender && sender.tab && sender.tab.url && M.isVideoSitePage(sender.tab.url)) {
+      prewarm(sender.tab.url);
+      return false;
+    }
     if (msg.type === 'media-grab' && sender && sender.tab) {
       (async () => {
         const tabId = sender.tab.id;
-        if (sender.tab.url && M.isVideoSitePage(sender.tab.url)) return reply(await sendToKdm(sender.tab.url)); // YouTube etc.: KDM's video downloader takes the page
+        if (sender.tab.url && M.isVideoSitePage(sender.tab.url)) return reply(await sendToKdm(sender.tab.url, { fileName: M.suggestName(sender.tab.title, sender.tab.url, 'mp4') })); // YouTube etc.: KDM's video downloader takes the page
         const direct = typeof msg.src === 'string' && /^https?:\/\//i.test(msg.src) && !M.looksLikeSegment(msg.src) ? msg.src : null;
         const list = await readList(tabId);
         const known = direct && list.find((e) => e.url === direct);

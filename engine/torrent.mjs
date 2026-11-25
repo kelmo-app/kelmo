@@ -15,6 +15,13 @@ const isTorrentFileUrl = (u) => {
   } catch { return false; }
 };
 /** A magnet link or a link to a .torrent file. */
+/** Path (inside the download folder) of the biggest file of a torrent, or null. */
+export function mainFileOf(files) {
+  let best = null;
+  for (const f of files || []) if (f && f.path && (!best || (f.length || 0) > (best.length || 0))) best = f;
+  return best ? String(best.path) : null;
+}
+
 export const isTorrentUrl = (u) => isMagnet(u) || isTorrentFileUrl(u);
 
 /** The name a magnet link carries ("dn=…"), or ''. */
@@ -168,6 +175,7 @@ export class TorrentDownload extends EventEmitter {
         clearTimeout(this._metaTimer);
         this.total = t.length || 0;
         this.fileName = t.name || this.fileName;
+        this.mainFile = mainFileOf(t.files); // the biggest file: what "Open" should play
         if (this.status === 'connecting') this.status = 'downloading';
         this.emit('state', this.status); // the host learns the real name and size
       };

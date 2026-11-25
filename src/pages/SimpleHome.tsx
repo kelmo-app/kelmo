@@ -189,7 +189,7 @@ export default function SimpleHome() {
         />
         <Sep />
         <div className="flex items-center rounded-xl border border-bad/25 bg-bad/5 px-0.5" role="group" aria-label="Remove from the list">
-          <ToolButton danger icon={Trash2} label="Delete" onClick={() => requestRemove(selected)} disabled={selected.length === 0} title="Remove the selected downloads from the list (files stay on disk)" />
+          <ToolButton danger icon={Trash2} label="Delete" onClick={() => requestRemove(selected)} disabled={selected.length === 0} title="Remove the selected downloads: from the list only, or also move their files to the Trash" />
           <ToolButton danger icon={Eraser} label="Clear finished" onClick={() => clearCompleted()} title="Remove all completed downloads from the list (files stay on disk)" />
         </div>
         <Sep />

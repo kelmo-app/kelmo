@@ -161,3 +161,10 @@ test('a .torrent file on this computer ("Open with KDM") is read and handed over
   assert.match(m.error, /not found/);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('mainFileOf picks the biggest file (the movie), ignoring subtitles and posters', async () => {
+  const { mainFileOf } = await import('../torrent.mjs');
+  assert.equal(mainFileOf([{ path: 'M/M.srt', length: 90 }, { path: 'M/M.mp4', length: 2e9 }, { path: 'M/p.jpg', length: 3e5 }]), 'M/M.mp4');
+  assert.equal(mainFileOf([]), null);
+  assert.equal(mainFileOf(undefined), null);
+});

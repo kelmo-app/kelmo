@@ -10,11 +10,12 @@ async function refresh() {
 }
 
 (async () => {
-  const s = await api.storage.local.get({ token: '', enabled: true });
+  const s = await api.storage.local.get({ token: '', enabled: true, prewarm: true });
   $('token').value = s.token;
   $('enabled').checked = s.enabled;
+  $('prewarm').checked = s.prewarm;
   $('save').addEventListener('click', async () => {
-    await api.storage.local.set({ token: $('token').value.trim(), enabled: $('enabled').checked });
+    await api.storage.local.set({ token: $('token').value.trim(), enabled: $('enabled').checked, prewarm: $('prewarm').checked });
     await refresh();
   });
   refresh();

@@ -151,7 +151,8 @@ export function summarize(j) {
   const muxedHeights = [...new Set(video.filter((f) => f.acodec && f.acodec !== 'none').map((f) => f.height))].sort((a, b) => b - a);
   const sizes = {};
   for (const h of heights) {
-    const best = video.filter((f) => f.height === h).sort((a, b) => (Number(b.tbr) || 0) - (Number(a.tbr) || 0))[0];
+    // the file yt-dlp itself takes at this height: its default order prefers AV1, then VP9, HEVC, H.264 (not the biggest one)
+    const best = video.filter((f) => f.height === h).sort((a, b) => codecRank(a) - codecRank(b) || (Number(b.tbr) || 0) - (Number(a.tbr) || 0))[0];
     const hasOwnAudio = best.acodec && best.acodec !== 'none';
     const own = size(best);
     sizes[h] = own ? own + (hasOwnAudio ? 0 : bestAudio ? size(bestAudio) : 0) : 0; // unknown stays unknown: the sound alone would be a wrong total
@@ -209,6 +210,11 @@ export function formatSelector(choice, hasFfmpeg) {
   if (choice === 'audio') return 'ba/b';
   if (hasFfmpeg) return h ? `bv*[height<=${h}]+ba/b[height<=${h}]/b` : 'bv*+ba/b';
   return h ? `b[height<=${h}]/b` : 'b';
+}
+
+function codecRank(f) {
+  const c = String(f.vcodec || '').toLowerCase();
+  return c.startsWith('av01') || c.startsWith('av1') ? 0 : c.startsWith('vp9') || c.startsWith('vp09') ? 1 : /^(hev|hvc|h265)/.test(c) ? 2 : /^(avc|h264)/.test(c) ? 3 : 4;
 }
 
 export async function probeVideo({ bin, url, runtime, proxy, cookie, timeoutMs = 60000 }) {
@@ -274,7 +280,7 @@ export class YtDlpDownload extends EventEmitter {
     this.rangeOk = true; // yt-dlp continues from its .part files
     this.error = null;
     this.isStream = true;
-    this._child = null; this._stop = null; this._doneBytes = 0; this._cur = 0; this._curFile = ''; this._curTotal = 0;
+    this._child = null; this._stop = null; this._doneBytes = 0; this._cur = 0; this._curFile = ''; this._curTotal = 0; this._realTotal = false;
     this._speed = 0; this._eta = null; this._lastEmit = 0; this._errLines = [];
   }
 
@@ -315,7 +321,12 @@ export class YtDlpDownload extends EventEmitter {
     this._curTotal = p.total || this._curTotal;
     this._speed = p.speed;
     this._eta = p.eta;
-    if (!this.expectedTotal) this.total = this._doneBytes + (this._curTotal || 0);
+    // The quality list only guesses a size (from bit rates). The moment yt-dlp reports the real size of the file it is receiving,
+    // that wins, so the total never stays a made-up number. The sound file adds its own size when its turn comes.
+    // A small difference is kept (the bar then does not jump when the sound file starts); a big one means the guess was wrong.
+    if (this._curTotal > 0 && !this._realTotal && (!this.expectedTotal || this.expectedTotal < this._doneBytes + this._curTotal || this.expectedTotal > (this._doneBytes + this._curTotal) * 1.5 + 20 * 1024 * 1024)) this._realTotal = true;
+    if (this._realTotal) this.total = this._doneBytes + this._curTotal;
+    else if (!this.expectedTotal) this.total = this._doneBytes + (this._curTotal || 0);
     this._emitProgress(false);
   }
 
@@ -333,7 +344,7 @@ export class YtDlpDownload extends EventEmitter {
   async start() {
     if (this.status === 'downloading' || this.status === 'connecting') return;
     this._stop = null; this.error = null; this._errLines = [];
-    this._doneBytes = 0; this._cur = 0; this._curFile = ''; this._curTotal = 0;
+    this._doneBytes = 0; this._cur = 0; this._curFile = ''; this._curTotal = 0; this._realTotal = false; this.total = this.expectedTotal;
     this._set('connecting');
     try { await fs.mkdir(this.dir, { recursive: true }); } catch (e) { this.error = e.message; return this._set('failed'); }
     for (;;) {

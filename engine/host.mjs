@@ -174,6 +174,9 @@ export function createHost(emit, opts = {}) {
       : new Download({
         ...common,
         fileName: spec.fileName ? uniqueName(dir, spec.fileName) : undefined,
+        autoName: spec.autoName === true,
+        adopt: spec.adopt === true,
+        pickName: (n) => uniqueName(dir, n),
         allocation: spec.allocation,
         mirrors: Array.isArray(spec.mirrors) ? spec.mirrors.filter((u) => typeof u === 'string' && u.length < 4096).slice(0, 8) : [],
       });
@@ -184,6 +187,7 @@ export function createHost(emit, opts = {}) {
         id: spec.id, type: 'state', status, error: d.error,
         fileName: d.fileName ?? null, total: d.total, rangeOk: d.rangeOk,
         path: d.fileName ? path.join(d.dir, d.fileName) : null,
+        ...(d.mainFile ? { mainFile: d.mainFile } : {}),
       });
       if (TERMINAL.has(status) && live.get(spec.id) === d) live.delete(spec.id);
     });

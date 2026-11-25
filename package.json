@@ -1,7 +1,7 @@
 {
   "name": "kelmo",
   "productName": "KELMO",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "KELMO — The Open Download Workspace. An open-source GPLv3 download manager for Windows and Linux.",
   "author": "KELMO Contributors",
   "license": "GPL-3.0-or-later",
@@ -27,7 +27,7 @@
     "package:rpm": "npm run build && electron-builder --linux dir && bash scripts/make-rpm.sh",
     "dev:nogpu": "concurrently -k -n vite,electron -c cyan,yellow \"vite --host 127.0.0.1\" \"wait-on tcp:127.0.0.1:5173 && cross-env KELMO_DEV=1 electron . --no-sandbox --disable-gpu\"",
     "test:live": "tsx scripts/live-e2e.mts",
-    "test:bridge": "node --test electron/test/bridge.test.mjs electron/test/extension.test.mjs electron/test/popups.test.mjs electron/test/power.test.mjs electron/test/media.test.mjs electron/test/secrets.test.mjs electron/test/clipboard.test.mjs electron/test/contextmenu.test.mjs electron/test/diaglog.test.mjs electron/test/native.test.mjs"
+    "test:bridge": "node --test electron/test/bridge.test.mjs electron/test/extension.test.mjs electron/test/popups.test.mjs electron/test/power.test.mjs electron/test/media.test.mjs electron/test/secrets.test.mjs electron/test/clipboard.test.mjs electron/test/contextmenu.test.mjs electron/test/diaglog.test.mjs electron/test/native.test.mjs electron/test/opentarget.test.mjs electron/test/trash.test.mjs electron/test/videocache.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -19,6 +19,8 @@ export interface EngineAdvance {
   bytes: number;
   /** set when the transfer failed */
   error?: string;
+  /** set by a real engine when the transfer finished (needed when the size was never known) */
+  done?: boolean;
 }
 
 export interface VerifyResult {
@@ -52,7 +54,7 @@ export interface DownloadEngine {
    * Real engines learn facts asynchronously (file size after the first request,
    * the server-chosen file name). Return them here; the manager merges them.
    */
-  sync?(item: DownloadItem): { totalBytes?: number; fileName?: string; connections?: number; resumable?: boolean } | null;
+  sync?(item: DownloadItem): { totalBytes?: number; fileName?: string; connections?: number; resumable?: boolean; mainFile?: string } | null;
   /** Global settings the engine must enforce itself (e.g. the shared speed cap). */
   configure?(cfg: EngineConfig): void;
   /** Hash a finished file. With `expected` the algorithm follows its length and `match` says whether it agrees. null = could not be read. */

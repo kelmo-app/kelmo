@@ -20,7 +20,7 @@ export function ConfirmDialog() {
             {req?.cancelLabel ?? 'Cancel'}
           </Button>
           <Button
-            variant={req?.tone === 'danger' ? 'danger' : 'primary'}
+            variant={req?.tone === 'danger' ? (req?.alt ? 'secondary' : 'danger') : 'primary'}
             onClick={() => {
               const run = req?.onConfirm;
               close();
@@ -29,10 +29,21 @@ export function ConfirmDialog() {
           >
             {req?.confirmLabel ?? 'Confirm'}
           </Button>
+          {req?.alt && (
+            <Button
+              variant="danger"
+              onClick={() => {
+                const run = req.alt?.onConfirm;
+                close();
+                run?.();
+              }}
+            >
+              {req.alt.label}
+            </Button>
+          )}
         </>
       }
     >
-      <span className="sr-only">Please confirm this action.</span>
     </Modal>
   );
 }

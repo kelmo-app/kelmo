@@ -29,12 +29,28 @@ export class Limiter {
   }
 }
 
-export function fileNameFrom(url, headers) {
+const cleanName = (raw) => path.basename(raw).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_');
+
+/** The file name the server itself announces ("Content-Disposition"), or '' when it announces none. */
+export function dispositionName(headers) {
   const cd = headers.get('content-disposition') || '';
-  const m = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(cd);
-  const raw = m ? decodeURIComponent(m[1] || m[2]) : decodeURIComponent(new URL(url).pathname.split('/').pop() || '');
-  return path.basename(raw).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_') || 'download.bin';
+  // the extended form (filename*=UTF-8''…, any language) wins over the plain one when both are present
+  const ext = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(cd);
+  const plain = /(?:^|[;\s])filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+  const raw = ext ? ext[1] : plain ? plain[1] : '';
+  if (!raw) return '';
+  try { return cleanName(decodeURIComponent(raw.trim())); } catch { return cleanName(raw.trim()); }
 }
+
+export function fileNameFrom(url, headers) {
+  const fromHeader = dispositionName(headers);
+  if (fromHeader) return fromHeader;
+  let raw = '';
+  try { raw = decodeURIComponent(new URL(url).pathname.split('/').pop() || ''); } catch { /* keep empty */ }
+  return cleanName(raw) || 'download.bin';
+}
+
+const GOOGLE_DRIVE = /(^|\.)(drive\.google\.com|drive\.usercontent\.google\.com|docs\.google\.com)$/i;
 
 /** Quick look at a link without downloading it: size, real file name, resume support, content type. */
 export async function probeUrl(url, headers = {}, timeoutMs = 8000, proxy = null) {
@@ -78,6 +94,9 @@ export class Download extends EventEmitter {
   constructor(o) {
     super();
     this.url = o.url; this.dir = o.dir; this.fileName = o.fileName;
+    this.adopt = o.adopt === true; // the link was replaced by the person (new address for an expired one): keep what was already downloaded
+    this.autoName = o.autoName === true; // the name was only guessed from the link, so the server's own name may replace it
+    this.pickName = typeof o.pickName === 'function' ? o.pickName : null;
     this.connections = o.connections ?? 8;
     this.limiter = o.speedLimit instanceof Limiter ? o.speedLimit : new Limiter(o.speedLimit ?? 0);
     this.shared = o.sharedLimiter ?? null; // global limiter shared by all downloads
@@ -115,8 +134,21 @@ export class Download extends EventEmitter {
       this.total = +(r.headers.get('content-length') || 0);
     } else throw new Error(`HTTP ${r.status}`);
     this.etag = r.headers.get('etag') || null;
-    this.fileName ??= fileNameFrom(r.url || this.url, r.headers);
+    const announced = dispositionName(r.headers);
+    if (this.autoName && announced) this.fileName = this.pickName ? this.pickName(announced) : announced;
+    else this.fileName ??= fileNameFrom(r.url || this.url, r.headers);
+    const ctype = (r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     await r.body?.cancel().catch(() => {});
+    // Google Drive answers big files with a "can't scan for viruses" page; saving that page as the file is never what anyone wants.
+    if (/^(text\/html|application\/xhtml)/.test(ctype) && !announced) {
+      let host = '';
+      try { host = new URL(r.url || this.url).hostname; } catch { /* no host */ }
+      if (GOOGLE_DRIVE.test(host)) throw new Error('Google Drive sent a web page instead of the file (large files need a confirmation). Open the link in your browser and press "Download anyway"; KDM takes it from there.');
+    }
+    // A .torrent link that answers with a web page (login, captcha, expired link) is not a torrent: do not save it as one.
+    if (/^(text\/html|application\/xhtml)/.test(ctype) && /\.torrent$/i.test(this.fileName || '')) {
+      throw new Error('The site sent a web page instead of the .torrent file (login, captcha or an expired link). Log in on the site and try again, or use the magnet link.');
+    }
   }
 
   /**
@@ -207,7 +239,9 @@ export class Download extends EventEmitter {
   async _loadOrInit() {
     let saved = null;
     try { saved = JSON.parse(await fs.readFile(this.statePath, 'utf8')); } catch {}
-    const ok = saved && (saved.url === this.url || (this._known ?? [this.url]).includes(saved.url)) && saved.total === this.total && saved.etag === this.etag && this.rangeOk;
+    // A replaced address is a different URL (and often a different ETag) for the same file: the size must still match exactly.
+    const sameSource = saved && (saved.url === this.url || (this._known ?? [this.url]).includes(saved.url)) && saved.etag === this.etag;
+    const ok = saved && (sameSource || this.adopt) && saved.total === this.total && this.rangeOk;
     if (ok) { this.segments = saved.segments; this._fh = await fs.open(this.part, 'r+'); return; }
     this._fh = await fs.open(this.part, 'w+');
     this._streamed = 0;

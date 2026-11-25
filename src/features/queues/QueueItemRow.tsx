@@ -2,7 +2,7 @@ import { memo, type KeyboardEvent } from 'react';
 import { GripVertical, Link2 } from 'lucide-react';
 import type { DownloadItem, Priority } from '@/types';
 import { cn } from '@/lib/cn';
-import { formatBytes, formatEta } from '@/lib/format';
+import { formatBytes, formatEta, formatTotal } from '@/lib/format';
 import { useDownloadStore } from '@/store/instances';
 import { useUiStore } from '@/store/uiStore';
 import { PriorityBadge, SpeedBadge, StatusBadge } from '@/components/Badges';
@@ -44,7 +44,7 @@ function QueueItemRowBase({ item, selected, dnd, canMoveUp, canMoveDown, onMoveU
   const meta =
     item.status === 'completed'
       ? `${formatBytes(item.totalBytes)} · completed`
-      : `${formatBytes(item.downloadedBytes)} of ${formatBytes(item.totalBytes)}${running && item.eta != null ? ` • ${formatEta(item.eta)} left` : ''}`;
+      : `${formatBytes(item.downloadedBytes)} of ${formatTotal(item.totalBytes)}${running && item.eta != null ? ` • ${formatEta(item.eta)} left` : ''}`;
 
   return (
     <li

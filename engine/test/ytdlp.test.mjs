@@ -166,6 +166,18 @@ test('download: real progress across two files, joined name, command line is rig
   } finally { delete process.env.KDM_FAKE_LOG; delete process.env.KDM_FAKE_SLOW; }
 });
 
+test('download: a size guess that is far off is replaced by the real size yt-dlp reports (no 26 GB for a 2 GB file)', async () => {
+  const bin = path.join(withFake(), 'yt-dlp');
+  const d = new YtDlpDownload({ url: 'https://www.youtube.com/watch?v=abc', dir: tmp(), bin, fileName: 'big.mp4', choice: '720', expectedTotal: 50_000_000_000, ffmpeg: 'ffmpeg', runtime: 'node' });
+  const totals = [];
+  d.on('progress', (p) => totals.push(p.total));
+  void d.start();
+  await waitFor(d, 'completed');
+  assert.ok(totals.length >= 2);
+  assert.ok(totals.every((t) => t <= 1200), `totals were ${totals.join(',')}`); // never the invented 50 GB
+  assert.equal(totals[0], 1000); // the real size of the first file, right away
+});
+
 test('download: without ffmpeg only ready-made files are requested', async () => {
   const bin = path.join(withFake(), 'yt-dlp');
   const log = path.join(tmp(), 'args.log');
@@ -357,4 +369,16 @@ test('cookies: probing and downloading hand yt-dlp the file only when a login wa
     await probeVideo({ bin, url: 'https://www.youtube.com/watch?v=abc' });
     assert.equal(JSON.parse(fs.readFileSync(log, 'utf8').trim().split('\n')[0]).includes('--cookies'), false);
   } finally { delete process.env.KDM_FAKE_LOG; }
+});
+
+test('summarize: the size shown is that of the file yt-dlp would take (AV1 before the bigger VP9/H.264), not the biggest one', () => {
+  const j = {
+    id: 'x', title: 'T', duration: 100,
+    formats: [
+      { format_id: '271', vcodec: 'vp09.00.40.08', acodec: 'none', height: 1440, filesize: 900_000_000, tbr: 9000 },
+      { format_id: '400', vcodec: 'av01.0.12M.08', acodec: 'none', height: 1440, filesize: 100_000_000, tbr: 1000 },
+      { format_id: '140', vcodec: 'none', acodec: 'mp4a.40.2', abr: 128, filesize: 10_000_000 },
+    ],
+  };
+  assert.equal(summarize(j).sizes[1440], 110_000_000);
 });

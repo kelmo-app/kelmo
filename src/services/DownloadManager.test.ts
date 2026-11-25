@@ -305,3 +305,58 @@ describe('DownloadManager — queue speed cap reaches the engine', () => {
     expect(h.calls.length).toBeGreaterThan(before);
   });
 });
+
+describe('DownloadManager — a torrent is filed by its biggest file', () => {
+  it('moves a General torrent to Video and remembers the main file', () => {
+    const engine: DownloadEngine = new MockDownloadEngine();
+    engine.sync = () => ({ fileName: 'The Witch (2018) WORLD', mainFile: 'The Witch (2018) WORLD/The.Witch.mp4' });
+    const seed = createSeed(NOW);
+    const clock = { now: NOW };
+    const manager = new DownloadManager({ items: seed.items, queues: seed.queues, activity: seed.activity, history: seed.history }, { clock: () => clock.now, random: mulberry32(7), rules: seed.rules, engine });
+    const added = manager.addDownload({ url: 'magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn=Witch' });
+    for (let i = 0; i < 6; i++) { clock.now += 500; manager.tick(0.5, clock.now); }
+    const it = manager.getState().items[added.id];
+    expect(added.category).toBe('General');
+    expect(it?.category).toBe('Video');
+    expect(it?.mainFile).toBe('The Witch (2018) WORLD/The.Witch.mp4');
+  });
+});
+
+describe('DownloadManager — no invented sizes', () => {
+  const make = (engine: DownloadEngine) => {
+    const seed = createSeed(NOW);
+    const clock = { now: NOW };
+    const manager = new DownloadManager({ items: seed.items, queues: seed.queues, activity: seed.activity, history: seed.history }, { clock: () => clock.now, random: mulberry32(7), rules: seed.rules, engine });
+    const run = (n: number) => { for (let i = 0; i < n; i++) { clock.now += 500; manager.tick(0.5, clock.now); } };
+    return { manager, run };
+  };
+
+  it('the demo engine keeps its pretend size; a real engine starts with an unknown (0) size, never a made-up one', () => {
+    const demo = make(new MockDownloadEngine());
+    expect(demo.manager.addDownload({ url: 'https://example.com/a.zip' }).totalBytes).toBeGreaterThan(0);
+    const real: DownloadEngine = new MockDownloadEngine();
+    real.sync = () => null;
+    expect(make(real).manager.addDownload({ url: 'https://example.com/a.zip' }).totalBytes).toBe(0);
+  });
+
+  it('an unknown size never counts as "reached"; the download completes when the engine says done, at the size that arrived', () => {
+    const engine: DownloadEngine = new MockDownloadEngine();
+    engine.sync = () => null;
+    let phase: 'run' | 'done' = 'run';
+    engine.advance = () => (phase === 'run' ? { bytes: 1000 } : { bytes: 500, done: true });
+    const { manager, run } = make(engine);
+    const added = manager.addDownload({ url: 'https://example.com/a.zip' });
+    run(6);
+    let it = manager.getState().items[added.id];
+    expect(it.status).toBe('downloading');
+    expect(it.totalBytes).toBe(0);
+    expect(it.progress).toBe(0);
+    expect(it.eta).toBeNull();
+    phase = 'done';
+    run(2);
+    it = manager.getState().items[added.id];
+    expect(it.status).toBe('completed');
+    expect(it.totalBytes).toBe(it.downloadedBytes);
+    expect(it.totalBytes).toBeGreaterThan(0);
+  });
+});

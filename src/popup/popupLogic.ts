@@ -1,6 +1,6 @@
 /** Pure helpers for the small IDM-style windows (kept free of React so they are unit-testable). */
 import type { Category, DownloadItem } from '@/types';
-import type { ConnectionDetail, PopupItem } from '@/types/global';
+import type { ConnectionDetail, PopupItem, UnfinishedItem } from '@/types/global';
 import { CATEGORIES, classifyFile, normalizeCategory } from '@/lib/url';
 import { formatBytes, formatEta, formatSpeed } from '@/lib/format';
 
@@ -9,11 +9,34 @@ export interface CategoryFolder {
   folder: string;
 }
 
-export const FALLBACK_FOLDERS: CategoryFolder[] = CATEGORIES.map((name) => ({ name, folder: `~/Downloads/KELMO/${name}` }));
+export const FALLBACK_FOLDERS: CategoryFolder[] = CATEGORIES.map((name) => ({ name, folder: name === 'General' ? '~/Downloads/KELMO' : `~/Downloads/KELMO/${name}` }));
 
 export function folderFor(category: string, folders: CategoryFolder[]): string {
   const list = folders.length ? folders : FALLBACK_FOLDERS;
   return (list.find((c) => c.name === category) ?? list.find((c) => c.name === 'General') ?? list[0]).folder;
+}
+
+const baseName = (n: string) => n.trim().toLowerCase().replace(/ \(\d+\)(?=\.[^.]+$|$)/, '');
+
+/**
+ * A link that arrives while a half-finished download exists: is it the same file under a new address (an expired
+ * or broken link opened again from the page)? The person asking for a new address ("waiting") is trusted; otherwise
+ * the size must match exactly and the name must be the same.
+ */
+export function findUnfinishedMatch(
+  list: UnfinishedItem[] | undefined,
+  found: { fileName: string; size: number },
+  waitingId?: string | null,
+): { item: UnfinishedItem; waiting: boolean } | null {
+  if (!list || !list.length) return null;
+  const sizeOk = (it: UnfinishedItem) => !(found.size > 0 && it.totalBytes > 0) || found.size === it.totalBytes;
+  if (waitingId) {
+    const w = list.find((i) => i.id === waitingId);
+    if (w && sizeOk(w)) return { item: w, waiting: true };
+  }
+  if (!(found.size > 0)) return null;
+  const hit = list.find((i) => i.totalBytes === found.size && i.downloadedBytes > 0 && baseName(i.fileName) === baseName(found.fileName));
+  return hit ? { item: hit, waiting: false } : null;
 }
 
 export function categoryOfName(fileName: string): Category {
@@ -83,6 +106,7 @@ export function popupItems(items: DownloadItem[], after: Map<string, After>, now
       id: i.id,
       url: i.url,
       fileName: i.fileName,
+      ...(i.mainFile ? { mainFile: i.mainFile } : {}),
       destination: i.destination,
       status: i.status,
       totalBytes: i.totalBytes,

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ChevronDown, ChevronUp, Copy, FolderOpen, Gauge, Pause, Play, RotateCcw, Settings2, Download, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, FolderOpen, Gauge, Pause, Play, RotateCcw, Settings2, SlidersHorizontal, Download, X } from 'lucide-react';
 import type { ConnectionDetail, PopupItem } from '@/types/global';
 import { cn } from '@/lib/cn';
 import { formatBytes, formatEta, formatSpeed } from '@/lib/format';
@@ -56,103 +56,109 @@ function Row({ k, children, tone }: { k: string; children: ReactNode; tone?: 'ok
   );
 }
 
-/** IDM's running-download window, restyled: art, facts, one big bar, and (optionally) every connection. */
+/** Compact running-download window: one glance (name, bar, speed, time, size) and two buttons. Everything else hides behind two small switches. */
 export function ProgressView(p: ProgressViewProps) {
   const { item } = p;
   const pct = percentOf(item);
   const rows = progressRows(item);
-  const kind = artKind(item.fileName);
+  const kind = artKind(item.mainFile || item.fileName);
   const paused = item.status === 'paused';
   const failed = item.status === 'failed';
   const finished = item.status === 'completed' || item.status === 'cancelled';
   const running = item.status === 'downloading';
-  const tab = (t: ProgressTab, label: string, Icon: typeof Gauge) => (
+  const settingsOpen = p.tab !== 'status';
+  const sub = (t: ProgressTab, label: string, Icon: typeof Gauge) => (
     <button
       type="button"
       onClick={() => p.onTab(t)}
       className={cn(
-        'flex items-center gap-2 rounded-t-lg border border-b-0 px-3.5 py-2 text-[13px] transition',
+        'flex items-center gap-2 rounded-t-lg border border-b-0 px-3 py-1.5 text-[13px] transition',
         p.tab === t ? 'border-line bg-surface font-medium text-fg' : 'border-transparent text-fg3 hover:text-fg',
       )}
     >
-      <Icon size={15} aria-hidden /> {label}
+      <Icon size={14} aria-hidden /> {label}
     </button>
   );
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4 [&>*]:shrink-0" data-testid="progress-view">
-      <div className="-mb-3 flex gap-1 border-b border-line">
-        {tab('status', 'Download status', Download)}
-        {tab('limit', 'Speed limiter', Gauge)}
-        {tab('after', 'On completion', Settings2)}
+    <div className="h-full overflow-y-auto" data-testid="progress-view">
+    {/* data-fit: the window is sized to exactly this block (see ProgressPopup) */}
+    <div className="flex flex-col gap-3 p-4 [&>*]:shrink-0" data-fit>
+      <div className="flex items-center gap-3.5">
+        <FileArt kind={kind} size={56} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[17px] font-semibold leading-snug text-fg" title={item.fileName}>
+            {item.fileName || 'Connecting…'}
+          </p>
+          <p className="truncate font-mono text-xs text-fg3" title={fullPath(item)}>
+            {fullPath(item)}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={cn('text-[13px] font-medium', failed ? 'text-bad' : paused ? 'text-warn' : 'text-accent')}>{statusText(item)}</span>
+          <button
+            type="button"
+            onClick={() => p.onTab(settingsOpen ? 'status' : 'limit')}
+            aria-expanded={settingsOpen}
+            aria-label="Speed limiter and what happens when it finishes"
+            title="Speed limiter · On completion"
+            className={cn('grid h-8 w-8 place-items-center rounded-md border transition', settingsOpen ? 'border-accent text-accent' : 'border-line text-fg2 hover:text-fg')}
+          >
+            <SlidersHorizontal size={16} aria-hidden />
+          </button>
+        </div>
       </div>
 
-      <section className="rounded-b-lg rounded-tr-lg border border-t-0 border-line bg-surface p-4 text-[13px]">
-        {p.tab === 'status' && (
-          <div className="flex gap-4">
-            <FileArt kind={kind} size={112} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[17px] font-semibold text-fg" title={item.fileName}>
-                {item.fileName || 'Connecting…'}
-              </p>
-              <p className="truncate font-mono text-xs text-fg3" title={fullPath(item)}>
-                {fullPath(item)}
-              </p>
-              <dl className="mt-3 grid grid-cols-[128px_1fr] gap-y-1">
-                <Row k="Status" tone={failed ? 'bad' : running ? 'ok' : undefined}>
-                  {statusText(item)}
-                </Row>
-                <Row k="Category">{ART_LABEL[kind]}</Row>
-                <Row k="File size">{rows.size}</Row>
-                <Row k="Downloaded">{rows.downloaded}</Row>
-                <Row k="Transfer rate">{rows.rate}</Row>
-                <Row k="Time left">{rows.left}</Row>
-                <Row k="Resume capability">{rows.resume}</Row>
-              </dl>
-            </div>
+      {settingsOpen && (
+        <div>
+          <div className="flex gap-1 border-b border-line">
+            {sub('limit', 'Speed limiter', Gauge)}
+            {sub('after', 'On completion', Settings2)}
           </div>
-        )}
-        {p.tab === 'limit' && (
-          <div className="flex flex-col gap-3">
-            <Checkbox checked={p.limitOn} onCheckedChange={(on) => p.onLimit(on, p.limitKb)} label="Use speed limiter for this download" />
-            <label className="flex items-center gap-2">
-              Limit to
-              <input
-                type="number"
-                min={1}
-                className="h-8 w-28 rounded-md border border-line bg-surface2 px-2 text-sm text-fg"
-                value={p.limitKb}
-                onChange={(e) => p.onLimit(p.limitOn, Math.max(1, Number(e.target.value) || 1))}
-                aria-label="Speed limit in KB per second"
-              />
-              KB/s <span className="text-fg3">(≈ {(p.limitKb / 1024).toFixed(2)} MB/s)</span>
-            </label>
-            <p className="text-xs text-fg3">Applies right away. Other downloads are not affected.</p>
-          </div>
-        )}
-        {p.tab === 'after' && (
-          <div className="flex flex-col gap-2.5">
-            <p className="text-fg3">When this download finishes:</p>
-            {(['none', 'file', 'folder'] as const).map((m) => (
-              <label key={m} className="flex items-center gap-2">
-                <input type="radio" name="after" checked={item.afterOpen === m} onChange={() => p.onAction('after', m)} className="accent-[rgb(var(--accent))]" />
-                {m === 'none' ? 'Do nothing' : m === 'file' ? 'Open the file' : 'Open the folder'}
-              </label>
-            ))}
-            <Checkbox checked={p.showDone} onCheckedChange={p.onShowDone} label="Show the “Download complete” window" />
-            <div className="mt-1 border-t border-line pt-3">
-              <p className="mb-1.5 text-fg3">When <b className="font-medium text-fg">all</b> downloads have finished:</p>
-              {AFTER_ALL_OPTIONS.map((o) => (
-                <label key={o.value} className="flex items-center gap-2 py-0.5">
-                  <input type="radio" name="afterAll" checked={p.afterAll === o.value} onChange={() => p.onAction('afterAll', o.value)} className="accent-[rgb(var(--accent))]" />
-                  {o.label}
+          <section className="rounded-b-lg rounded-tr-lg border border-t-0 border-line bg-surface p-4 text-[13px]">
+            {p.tab === 'limit' && (
+              <div className="flex flex-col gap-3">
+                <Checkbox checked={p.limitOn} onCheckedChange={(on) => p.onLimit(on, p.limitKb)} label="Use speed limiter for this download" />
+                <label className="flex items-center gap-2">
+                  Limit to
+                  <input
+                    type="number"
+                    min={1}
+                    className="h-8 w-28 rounded-md border border-line bg-surface2 px-2 text-sm text-fg"
+                    value={p.limitKb}
+                    onChange={(e) => p.onLimit(p.limitOn, Math.max(1, Number(e.target.value) || 1))}
+                    aria-label="Speed limit in KB per second"
+                  />
+                  KB/s <span className="text-fg3">(≈ {(p.limitKb / 1024).toFixed(2)} MB/s)</span>
                 </label>
-              ))}
-              {p.afterAll === 'sleep' || p.afterAll === 'shutdown' ? <p className="mt-1.5 text-xs text-fg3">You get 60 seconds to press Cancel before anything happens.</p> : null}
-            </div>
-          </div>
-        )}
-      </section>
+                <p className="text-xs text-fg3">Applies right away. Other downloads are not affected.</p>
+              </div>
+            )}
+            {p.tab === 'after' && (
+              <div className="flex flex-col gap-2.5">
+                <p className="text-fg3">When this download finishes:</p>
+                {(['none', 'file', 'folder'] as const).map((m) => (
+                  <label key={m} className="flex items-center gap-2">
+                    <input type="radio" name="after" checked={item.afterOpen === m} onChange={() => p.onAction('after', m)} className="accent-[rgb(var(--accent))]" />
+                    {m === 'none' ? 'Do nothing' : m === 'file' ? 'Open the file' : 'Open the folder'}
+                  </label>
+                ))}
+                <Checkbox checked={p.showDone} onCheckedChange={p.onShowDone} label="Show the “Download complete” window" />
+                <div className="mt-1 border-t border-line pt-3">
+                  <p className="mb-1.5 text-fg3">When <b className="font-medium text-fg">all</b> downloads have finished:</p>
+                  {AFTER_ALL_OPTIONS.map((o) => (
+                    <label key={o.value} className="flex items-center gap-2 py-0.5">
+                      <input type="radio" name="afterAll" checked={p.afterAll === o.value} onChange={() => p.onAction('afterAll', o.value)} className="accent-[rgb(var(--accent))]" />
+                      {o.label}
+                    </label>
+                  ))}
+                  {p.afterAll === 'sleep' || p.afterAll === 'shutdown' ? <p className="mt-1.5 text-xs text-fg3">You get 60 seconds to press Cancel before anything happens.</p> : null}
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         <div className="h-3.5 flex-1 overflow-hidden rounded-full border border-line bg-surface2" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Download progress">
@@ -165,6 +171,12 @@ export function ProgressView(p: ProgressViewProps) {
         <Fact icon={Gauge} label="Current speed" value={running && item.speed > 0 ? formatSpeed(item.speed) : '—'} />
         <Fact icon={Download} label="Time left" value={running && item.eta != null ? formatEta(item.eta) : '—'} />
         <Fact icon={Copy} label="Downloaded" value={`${formatBytes(item.downloadedBytes)}${item.totalBytes ? ` / ${formatBytes(item.totalBytes)}` : ''}`} />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button size="sm" onClick={p.onToggleDetails} icon={p.showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />} aria-expanded={p.showDetails}>
+          {p.showDetails ? 'Hide details' : 'Show details'}
+        </Button>
         <div className="ml-auto flex gap-2">
           {!finished && !failed && (
             <Button variant="primary" onClick={() => p.onAction(paused ? 'resume' : 'pause')} icon={paused ? <Play size={15} /> : <Pause size={15} />}>
@@ -188,28 +200,35 @@ export function ProgressView(p: ProgressViewProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button size="sm" onClick={p.onToggleDetails} icon={p.showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />} aria-expanded={p.showDetails}>
-          {p.showDetails ? 'Hide details' : 'Show details'}
-        </Button>
-        <div className="min-w-0 flex-1">
-          <p className="mb-1 text-[11px] text-fg3">
-            {item.resumable === false ? 'Single connection — this server does not allow splitting the file' : `Progress by connection${p.detail?.workers.length ? ` (${p.detail.workers.length})` : ''}`}
-          </p>
-          <SegmentBar detail={p.detail} total={item.totalBytes} />
-        </div>
-      </div>
-
-      {p.showDetails && <ConnectionTable detail={p.detail} history={p.history} />}
-
-      <div className="mt-auto flex items-center gap-2 pt-1">
-        <Button size="sm" onClick={p.onOpenFolder} icon={<FolderOpen size={14} />}>
-          Open folder
-        </Button>
-        <Button size="sm" onClick={p.onCopyLink} icon={<Copy size={14} />}>
-          Copy link
-        </Button>
-      </div>
+      {p.showDetails && (
+        <section className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 text-[13px]">
+          <dl className="grid grid-cols-[128px_1fr] gap-y-1">
+            <Row k="Status" tone={failed ? 'bad' : running ? 'ok' : undefined}>
+              {statusText(item)}
+            </Row>
+            <Row k="Category">{ART_LABEL[kind]}</Row>
+            <Row k="File size">{rows.size}</Row>
+            <Row k="Transfer rate">{rows.rate}</Row>
+            <Row k="Resume capability">{rows.resume}</Row>
+          </dl>
+          <div>
+            <p className="mb-1 text-[11px] text-fg3">
+              {item.resumable === false ? 'Single connection — this server does not allow splitting the file' : `Progress by connection${p.detail?.workers.length ? ` (${p.detail.workers.length})` : ''}`}
+            </p>
+            <SegmentBar detail={p.detail} total={item.totalBytes} />
+          </div>
+          <ConnectionTable detail={p.detail} history={p.history} />
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={p.onOpenFolder} icon={<FolderOpen size={14} />}>
+              Open folder
+            </Button>
+            <Button size="sm" onClick={p.onCopyLink} icon={<Copy size={14} />}>
+              Copy link
+            </Button>
+          </div>
+        </section>
+      )}
+    </div>
     </div>
   );
 }

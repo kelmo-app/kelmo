@@ -60,7 +60,7 @@ export function useItemActions() {
     async (id: string) => {
       const it = store().items[id];
       if (!it) return;
-      const res = await platform.openPath(`${it.destination}/${it.fileName}`);
+      const res = await platform.openPath(`${it.destination}/${it.mainFile || it.fileName}`);
       useUiStore.getState().toast(
         res.simulated
           ? { tone: 'info', title: 'Open file', description: `Would open ${it.fileName} (desktop app only)` }

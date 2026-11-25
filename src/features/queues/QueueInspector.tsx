@@ -1,6 +1,6 @@
 import { ArrowUpToLine, Eye, MousePointerClick, Pause, Play, RotateCw, Trash2 } from 'lucide-react';
 import type { DownloadItem, Priority } from '@/types';
-import { formatBytes, formatEta, formatMBps } from '@/lib/format';
+import { formatBytes, formatTotal, formatEta, formatMBps } from '@/lib/format';
 import { useDownloadStore } from '@/store/instances';
 import { useUiStore } from '@/store/uiStore';
 import { useItemActions } from '@/hooks/useItemActions';
@@ -58,7 +58,7 @@ export function QueueInspector({ item }: { item: DownloadItem | undefined }) {
         <ProgressBar value={item.progress} status={item.status} size="md" showValue label={`${item.fileName} progress`} />
 
         <div className="grid grid-cols-2 gap-2">
-          <Tile label="Downloaded" value={`${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`} />
+          <Tile label="Downloaded" value={`${formatBytes(item.downloadedBytes)} / ${formatTotal(item.totalBytes)}`} />
           <Tile label="Speed" value={running ? formatMBps(item.speed) : '—'} />
           <Tile label="ETA" value={running ? formatEta(item.eta) : '—'} />
           <Tile label="Connections" value={running ? String(item.connections) : '—'} />

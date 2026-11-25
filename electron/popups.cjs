@@ -8,6 +8,7 @@
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
+const { resolveOpenTarget } = require('./open-target.cjs');
 
 const ACTIONS = new Set(['pause', 'resume', 'cancel', 'limit', 'after', 'afterAll']);
 const PREFS = new Set(['showCompleteDialog', 'showProgressWindow', 'dropTarget']);
@@ -32,8 +33,8 @@ function createPopups({ seal, BrowserWindow, ipcMain, shell, dialog, getMain, en
 
   const sizes = {
     add: { width: 600, height: 480, onTop: true, title: 'KDM — Download File Info' },
-    progress: { width: 700, height: 684, onTop: false, title: 'KDM — Downloading' },
-    done: { width: 560, height: 250, onTop: true, title: 'KDM — Download complete' },
+    progress: { width: 700, height: 244, onTop: false, title: 'KDM — Downloading' },
+    done: { width: 700, height: 214, onTop: true, title: 'KDM — Download complete' },
     drop: { width: 96, height: 96, onTop: true, title: 'KDM drop target' },
     tray: { width: 380, height: 560, onTop: true, title: 'KELMO Quick Monitor' },
   };
@@ -298,6 +299,7 @@ function createPopups({ seal, BrowserWindow, ipcMain, shell, dialog, getMain, en
       dir: spec.dir,
       category: spec.category,
       startNow: !!spec.startNow,
+      replaceId: isId(spec.replaceId) ? spec.replaceId : undefined,
       referrer: typeof spec.referrer === 'string' ? spec.referrer.slice(0, 2048) : undefined,
       cookie: typeof spec.cookie === 'string' ? spec.cookie.slice(0, 16384) : undefined,
       userAgent: typeof spec.userAgent === 'string' ? spec.userAgent.slice(0, 512) : undefined,
@@ -343,7 +345,7 @@ function createPopups({ seal, BrowserWindow, ipcMain, shell, dialog, getMain, en
       else await shell.openPath(expandHome(it.destination));
       return { ok: true };
     }
-    const err = await shell.openPath(file);
+    const err = await shell.openPath(resolveOpenTarget(file));
     return err ? { ok: false, error: err } : { ok: true };
   });
   ipcMain.handle('popup:pick-folder', async (e) => {

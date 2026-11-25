@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { HeartPulse, FolderOpen, Loader2, Play } from 'lucide-react';
+import { HeartPulse, FolderOpen, Link2, Loader2, Play } from 'lucide-react';
+import { useUiStore } from '@/store/uiStore';
 import { cn } from '@/lib/cn';
 import { isMagnetUrl } from '@/lib/url';
 import { describeHealth, type HealthReport } from '@/lib/linkHealth';
@@ -41,6 +42,8 @@ export function SimpleDetail({ item, selectedCount }: { item: DownloadItem | nul
 
 function Selected({ item }: { item: DownloadItem }) {
   const [checking, setChecking] = useState(false);
+  const waiting = useUiStore((s) => s.linkWaitId === item.id);
+  const setLinkWait = useUiStore((s) => s.setLinkWait);
   const [report, setReport] = useState<HealthReport | null>(null);
   useEffect(() => setReport(null), [item.id]);
 
@@ -96,6 +99,21 @@ function Selected({ item }: { item: DownloadItem }) {
       <div className="w-40 shrink-0">
         <ProgressBar value={item.progress} status={item.status} showValue label="Selected download progress" />
       </div>
+      {['failed', 'paused', 'cancelled'].includes(item.status) && item.downloadedBytes > 0 && !item.video && !isMagnetUrl(item.url) && (
+        <Button
+          size="sm"
+          variant={waiting ? 'primary' : 'secondary'}
+          icon={<Link2 size={14} />}
+          onClick={() => {
+            if (waiting) { setLinkWait(null); return; }
+            setLinkWait(item.id);
+            useUiStore.getState().toast({ tone: 'info', title: 'Waiting for the new address', description: 'Open the page of this file in your browser and click Download. KDM will offer to continue this one.' }, 9000);
+          }}
+          title="The link expired or broke? Open the file's page again and download it from the browser: KDM continues from where it stopped."
+        >
+          {waiting ? 'Stop waiting' : 'New address'}
+        </Button>
+      )}
       {item.status !== 'completed' && (
         <Button size="sm" variant="secondary" disabled={checking} icon={checking ? <Loader2 size={14} className="animate-spin" /> : <HeartPulse size={14} />} onClick={() => void check()} title="Ask the server if this link still works">
           Check link

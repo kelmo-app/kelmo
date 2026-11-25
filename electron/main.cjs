@@ -14,6 +14,9 @@ const { createSecrets, basicHeader } = require('./secrets.cjs');
 const secrets = createSecrets(safeStorage);
 const { execFile } = require('node:child_process');
 const fs = require('node:fs');
+const { resolveOpenTarget } = require('./open-target.cjs');
+const { createVideoCache } = require('./video-cache.cjs');
+const { trashFiles } = require('./trash.cjs');
 
 const isDev = !!process.env.KELMO_DEV;
 let mainWindow = null;
@@ -155,8 +158,13 @@ const expandTilde = (p) => (p === '~' || p.startsWith('~/') ? path.join(os.homed
 ipcMain.handle('kelmo:open-path', async (_e, raw) => {
   if (typeof raw !== 'string' || !raw) return { ok: false, error: 'Invalid path' };
   const target = expandTilde(raw);
-  const err = await shell.openPath(target);
+  const err = await shell.openPath(resolveOpenTarget(target));
   return err ? { ok: false, error: err } : { ok: true };
+});
+
+ipcMain.handle('kelmo:trash-files', async (_e, entries) => {
+  try { return await trashFiles(entries, { trashItem: (p) => shell.trashItem(p) }); }
+  catch (e) { return { trashed: 0, missing: 0, failed: [String((e && e.message) || e)] }; }
 });
 
 ipcMain.handle('kelmo:show-in-folder', async (_e, raw) => {
@@ -236,6 +244,8 @@ function startBridge() {
     version: app.getVersion(),
     // IDM style: a small "Download File Info" window appears; the main window stays hidden.
     onAdd: (req) => popups.openAdd(req),
+    // the extension says a video page may be downloaded soon: read it now so the window opens ready (only if the video downloader is installed)
+    onPrewarm: (url) => { void (async () => { try { if ((await (await getEngine()).videoStatus()).installed) videoCache.warm(url); } catch { /* warm-up only */ } })(); },
   });
   listenOnFirstFree(server, 47631, 5).then((p) => (bridgePort = p)).catch(() => (bridgePort = null));
   registerNativeHost();
@@ -367,9 +377,12 @@ ipcMain.handle('kdm:video-install', async () => {
     return r;
   } catch (e) { diag(`video downloader install failed: ${e && e.message}`); return { ok: false, error: String((e && e.message) || e).slice(0, 300) }; }
 });
+const videoCache = createVideoCache({
+  probe: async (url, o) => (await getEngine()).videoProbe({ url, proxy: await proxyFor(url), cookie: o && o.cookie }),
+});
 ipcMain.handle('kdm:video-probe', async (_e, url, opts) => {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return { ok: false, error: 'Invalid link' };
-  try { return await (await getEngine()).videoProbe({ url, proxy: await proxyFor(url), cookie: opts && typeof opts.cookie === 'string' ? opts.cookie : undefined }); } catch (e) {
+  try { return await videoCache.get(url, { cookie: opts && typeof opts.cookie === 'string' ? opts.cookie : undefined }); } catch (e) {
     diag(`video probe failed ${redactUrl(url)}: ${e && e.message}`);
     return { ok: false, error: String((e && e.message) || e).slice(0, 300) };
   }

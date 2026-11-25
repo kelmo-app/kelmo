@@ -10,7 +10,7 @@ import { Checkbox, Select } from '@/components/ui/Fields';
 import { parseMirrors } from '@/lib/mirrors';
 import { FileArt } from './FileArt';
 import { ART_LABEL, artKind } from './fileArt';
-import { categoryOfName, folderFor } from './popupLogic';
+import { categoryOfName, findUnfinishedMatch, folderFor } from './popupLogic';
 import { LoginFields } from '@/components/LoginFields';
 import { VideoPanel } from '@/components/VideoPanel';
 import { useVideoLink } from '@/hooks/useVideoLink';
@@ -42,8 +42,9 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
   const [authUser, setAuthUser] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [nameTouched, setNameTouched] = useState(!!link.fileName);
-  const [category, setCategory] = useState<Category>(categoryOfName(link.fileName || fileNameFromUrl(link.url)));
+  // for a video page the name from the extension is only a stand-in (the page title); yt-dlp's real title replaces it
+  const [nameTouched, setNameTouched] = useState(!!link.fileName && !isVideoSite(link.url));
+  const [category, setCategory] = useState<Category>(isVideoSite(link.url) ? 'Video' : categoryOfName(link.fileName || fileNameFromUrl(link.url)));
   const [catTouched, setCatTouched] = useState(false);
   const [folder, setFolder] = useState(folderFor(category, folders));
   const [remember, setRemember] = useState(true);
@@ -55,13 +56,23 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
 
   // a YouTube-like page: yt-dlp reads it and offers qualities instead of the usual file check
   const video = useVideoLink(url, true, sameLink ? (link.cookie ?? '') : '');
-  const isVideo = video.state.kind !== 'none';
+  const isVideo = isVideoSite(url) || video.state.kind !== 'none';
   const [choice, setChoice] = useState('best');
   const ready = video.state.kind === 'ready' ? video.state.info : null;
   const ffmpeg = !!video.status?.ffmpeg;
   const choiceList = ready ? videoChoices(ready, ffmpeg).choices : [];
   const activeChoice = choiceList.some((c) => c.value === choice) ? choice : (choiceList[0]?.value ?? 'best');
   const chosenSize = choiceList.find((c) => c.value === activeChoice)?.size ?? 0;
+
+  // free space of the chosen drive, so a 26 GB video is not started on an 11 GB disk without a word
+  const [freeBytes, setFreeBytes] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const t = window.setTimeout(() => {
+      void (async () => { try { const r = await api.diskInfo?.(folder.trim() || '~'); if (alive) setFreeBytes(r ? r.free : null); } catch { if (alive) setFreeBytes(null); } })();
+    }, 250);
+    return () => { alive = false; window.clearTimeout(t); };
+  }, [folder]);
 
   useEffect(() => {
     document.title = 'Download File Info';
@@ -113,7 +124,7 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
   // category follows the file name until the user picks one
   useEffect(() => {
     if (catTouched) return;
-    const c = categoryOfName(fileName);
+    const c: Category = isVideoSite(url) ? 'Video' : categoryOfName(fileName);
     setCategory(c);
     setFolder(folderFor(c, folders));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,6 +163,20 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
     });
   };
 
+  // The same file again under a new address (an expired link opened again from its page): offer to continue the old download.
+  const resumeMatch = !isVideo && !isTorrent && info.state !== 'checking' && urlOk
+    ? findUnfinishedMatch(config?.unfinished, { fileName: fileName.trim(), size: info.data?.size ?? 0 }, config?.waitingId)
+    : null;
+  const continueOld = async () => {
+    if (!resumeMatch || busy) return;
+    setBusy(true);
+    await api.confirm({
+      url: url.trim(), fileName: resumeMatch.item.fileName, dir: folder.trim() || folderFor(category, folders), category, startNow: true,
+      replaceId: resumeMatch.item.id,
+      ...(sameLink ? { referrer: link.referrer, cookie: link.cookie, userAgent: link.userAgent } : {}),
+    });
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') void api.close();
@@ -161,6 +186,7 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
   }, [api]);
 
   const d = info.data;
+  const needBytes = isTorrent ? 0 : isVideo ? chosenSize : (d?.size ?? 0);
   const looksHtml = d?.contentType === 'text/html';
   const urlRef = useRef<HTMLInputElement>(null);
 
@@ -172,12 +198,23 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
         void submit(true);
       }}
     >
+      {resumeMatch && (
+        <div role="status" className="flex items-center gap-3 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2.5">
+          <div className="min-w-0 flex-1 text-[12.5px] leading-snug text-fg">
+            <p className="font-semibold">{resumeMatch.waiting ? 'This is the new address you were waiting for.' : 'You already have a half-finished download of this file.'}</p>
+            <p className="truncate text-fg2" title={resumeMatch.item.fileName}>
+              {resumeMatch.item.fileName} · {formatBytes(resumeMatch.item.downloadedBytes)}{resumeMatch.item.totalBytes ? ` of ${formatBytes(resumeMatch.item.totalBytes)}` : ''} done. Continue it from where it stopped?
+            </p>
+          </div>
+          <Button variant="primary" type="button" disabled={busy} onClick={() => void continueOld()}>Continue it</Button>
+        </div>
+      )}
       <div className="flex gap-4">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <label className="flex flex-col gap-1 text-[13px] font-medium">
             URL
             <input ref={urlRef} className={inputCls + ' font-mono text-[13px]'} value={url} onChange={(e) => setUrl(e.target.value)} spellCheck={false} aria-label="URL" />
-            <button type="button" className="self-start text-xs font-normal text-accent hover:underline" onClick={() => void browseTorrent()}>Choose a .torrent file…</button>
+            {!isVideo && <button type="button" className="self-start text-xs font-normal text-accent hover:underline" onClick={() => void browseTorrent()}>Choose a .torrent file…</button>}
           </label>
 
           <Select<Category>
@@ -250,11 +287,16 @@ export function AddPopup({ link, config }: { link: IncomingLink; config: PopupCo
           <FileArt kind={artKind(fileName)} size={84} />
           <span className="text-[11px] uppercase tracking-wide text-fg3">{ART_LABEL[artKind(fileName)]}</span>
           <span className="tnum text-sm font-semibold text-fg" data-testid="popup-size">
-            {isTorrent ? 'Torrent' : isVideo ? (chosenSize ? formatBytes(chosenSize) : '') : info.state === 'checking' ? '…' : d?.size ? formatBytes(d.size) : '?'}
+            {isTorrent ? 'Torrent' : isVideo ? (chosenSize ? formatBytes(chosenSize) : video.state.kind === 'loading' || video.state.kind === 'none' ? 'Checking size…' : '') : info.state === 'checking' ? '…' : d?.size ? formatBytes(d.size) : '?'}
           </span>
         </div>
       </div>
 
+      {freeBytes !== null && needBytes > 0 && needBytes > freeBytes && (
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-bad/50 bg-bad/10 px-3 py-2 text-xs text-bad">
+          <span>Not enough free space on this drive: about {formatBytes(needBytes)} is needed but only {formatBytes(freeBytes)} is free.{isVideo ? ' Pick a lower quality or another folder.' : ' Choose another folder.'}</span>
+        </div>
+      )}
       {isVideo && <VideoPanel url={url} state={video.state} status={video.status} choice={activeChoice} onChoice={setChoice} onInstall={() => void video.install()} onRetry={video.retry} canUseLogin={video.canUseLogin} loginOn={video.loginOn} onUseLogin={video.useLogin} />}
       {isTorrent && <div className="flex min-h-[34px] items-center gap-2 rounded-lg border border-line bg-surface2/50 px-3 py-2 text-xs text-fg3"><FileSearch className="h-3.5 w-3.5" aria-hidden /> BitTorrent: the name and size appear once peers are found. KDM stops when the download finishes (no seeding).</div>}
       {!isVideo && !isTorrent && <div className="flex min-h-[34px] items-center gap-2 rounded-lg border border-line bg-surface2/50 px-3 py-2 text-xs text-fg3" aria-live="polite">

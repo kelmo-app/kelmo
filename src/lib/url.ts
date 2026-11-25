@@ -85,5 +85,8 @@ export function normalizeCategory(c: unknown, fileName = ''): Category {
 /** Folder for a category: the user's choice, else `<default folder>/<category>`. */
 export function categoryFolder(category: Category, defaultFolder: string, overrides: Partial<Record<Category, string>> = {}): string {
   const o = overrides[category]?.trim();
-  return o || `${defaultFolder.replace(/\/+$/, '')}/${category}`;
+  // like IDM: files that fit no category go straight into the main folder; the other categories get a folder of their own
+  if (o) return o;
+  const base = defaultFolder.replace(/\/+$/, '');
+  return category === 'General' ? base : `${base}/${category}`;
 }

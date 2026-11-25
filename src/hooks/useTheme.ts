@@ -11,16 +11,17 @@ export function useThemeEffect(): void {
   const reduceMotion = useSettingsStore((s) => s.settings.reduceMotion);
   const minimizeToTray = useSettingsStore((s) => s.settings.startupBehavior.minimizeToTray);
   const vibrant = useSettingsStore((s) => s.settings.vibrant);
+  const palette = useSettingsStore((s) => s.settings.palette);
   const launchOnStartup = useSettingsStore((s) => s.settings.startupBehavior.launchOnStartup);
 
   useEffect(() => {
-    applyAppearance({ theme, accentColor: accent, density, reduceMotion, vibrant });
+    applyAppearance({ theme, accentColor: accent, density, reduceMotion, vibrant, palette });
     if (theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => applyAppearance({ theme, accentColor: accent, density, reduceMotion, vibrant });
+    const onChange = () => applyAppearance({ theme, accentColor: accent, density, reduceMotion, vibrant, palette });
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
-  }, [theme, accent, density, reduceMotion, vibrant]);
+  }, [theme, accent, density, reduceMotion, vibrant, palette]);
 
   useEffect(() => {
     void platform.setMinimizeToTray(minimizeToTray);

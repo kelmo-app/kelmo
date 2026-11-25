@@ -221,3 +221,115 @@ body {
 
 /* Recharts tooltip */
 .recharts-default-tooltip { background: rgb(var(--surface3)) !important; border: 1px solid rgb(var(--line)) !important; border-radius: 8px !important; }
+
+/* ------------------------------------------------------------------ */
+/* Colour schemes (Settings > Appearance). Each one is a complete set, so it sits after everything above.        */
+/* "gold" has no data-palette and keeps the copper look; the vibrant washes are switched off for these.         */
+/* ------------------------------------------------------------------ */
+:root[data-palette] body { background-image: none; }
+:root[data-palette] .bg-accent { background-image: none; }
+
+/* 1 · Windows-like light neutral, blue accent */
+:root[data-palette='windows'] {
+  --bg: 240 242 245; --surface: 252 252 253; --surface2: 243 245 248; --surface3: 230 234 240; --line: 214 220 228;
+  --fg: 28 32 40; --fg2: 82 90 102; --fg3: 108 116 128;
+  --accent: 0 96 214; --accent-fg: 255 255 255; --accent2: 40 130 240; --tint: 226 236 252;
+  --ok: 22 128 70; --warn: 176 110 6; --bad: 196 48 48; --info: 0 96 214;
+  --scrim: 20 28 40 / 0.40;
+}
+/* 2 · soft warm ivory, muted teal */
+:root[data-palette='ivory'] {
+  --bg: 250 244 234; --surface: 254 250 242; --surface2: 247 240 228; --surface3: 236 227 211; --line: 226 215 197;
+  --fg: 40 34 28; --fg2: 96 86 74; --fg3: 118 106 92;
+  --accent: 28 120 120; --accent-fg: 255 255 255; --accent2: 60 156 152; --tint: 220 240 238;
+  --ok: 28 132 78; --warn: 176 110 6; --bad: 196 56 52; --info: 28 120 120;
+  --scrim: 40 30 18 / 0.38;
+}
+/* 3 · cool slate, cyan */
+:root[data-palette='slate'] {
+  --bg: 50 62 74; --surface: 62 76 90; --surface2: 72 88 104; --surface3: 86 104 122; --line: 98 116 134;
+  --fg: 238 244 250; --fg2: 186 200 214; --fg3: 158 174 190;
+  --accent: 56 214 232; --accent-fg: 4 30 38; --accent2: 140 232 244;
+  --ok: 120 214 160; --warn: 246 184 70; --bad: 244 120 112; --info: 120 180 255;
+  --scrim: 10 16 24 / 0.55;
+}
+/* 4 · premium graphite, amber */
+:root[data-palette='graphite'] {
+  --bg: 28 28 30; --surface: 38 38 40; --surface2: 48 48 51; --surface3: 62 62 66; --line: 76 76 80;
+  --fg: 238 238 238; --fg2: 176 176 178; --fg3: 144 144 148;
+  --accent: 240 160 70; --accent-fg: 40 22 4; --accent2: 255 200 130;
+  --ok: 120 206 150; --warn: 245 170 50; --bad: 238 110 100; --info: 120 160 255;
+  --scrim: 0 0 0 / 0.6;
+}
+/* 8 · clean white, emerald */
+:root[data-palette='clean'] {
+  --bg: 244 246 247; --surface: 255 255 255; --surface2: 246 248 249; --surface3: 232 236 238; --line: 218 224 228;
+  --fg: 24 30 34; --fg2: 80 90 96; --fg3: 106 116 122;
+  --accent: 8 140 84; --accent-fg: 255 255 255; --accent2: 30 168 108; --tint: 222 244 232;
+  --ok: 8 140 84; --warn: 176 110 6; --bad: 196 48 48; --info: 40 100 200;
+  --scrim: 20 30 26 / 0.38;
+}
+
+/* ------------------------------------------------------------------ */
+/* Four warm colour systems — each has a Light and a Dark version and follows Theme (Dark / Light / System).     */
+/* ------------------------------------------------------------------ */
+/* Graphite Sand: warm charcoal + sand */
+:root[data-palette='sand'][data-theme='dark'] {
+  --bg: 33 25 27; --surface: 43 35 37; --surface2: 54 45 47; --surface3: 70 59 60; --line: 92 78 72;
+  --fg: 241 229 213; --fg2: 205 179 142; --fg3: 168 146 118;
+  --accent: 205 179 142; --accent-fg: 33 25 27; --accent2: 230 212 184;
+  --ok: 140 208 156; --warn: 240 190 90; --bad: 238 122 110; --info: 140 176 240;
+  --scrim: 10 6 6 / 0.62;
+}
+:root[data-palette='sand'][data-theme='light'] {
+  --bg: 241 229 213; --surface: 249 242 232; --surface2: 236 222 203; --surface3: 224 207 184; --line: 208 189 162;
+  --fg: 33 25 27; --fg2: 92 76 66; --fg3: 112 96 82;
+  --accent: 120 88 44; --accent-fg: 255 255 255; --accent2: 168 132 80; --tint: 240 226 204;
+  --ok: 28 122 72; --warn: 170 108 6; --bad: 190 54 50; --info: 52 96 190;
+  --scrim: 33 25 27 / 0.40;
+}
+/* Navy & Gold: royal blue + luminous gold */
+:root[data-palette='navygold'][data-theme='dark'] {
+  --bg: 10 28 68; --surface: 13 35 83; --surface2: 22 60 142; --surface3: 34 78 168; --line: 56 100 190;
+  --fg: 247 239 224; --fg2: 196 208 236; --fg3: 160 178 218;
+  --accent: 240 206 132; --accent-fg: 13 35 83; --accent2: 250 226 170;
+  --ok: 120 214 160; --warn: 244 196 90; --bad: 244 122 112; --info: 140 182 255;
+  --scrim: 2 8 28 / 0.62;
+}
+:root[data-palette='navygold'][data-theme='light'] {
+  --bg: 247 239 224; --surface: 253 248 238; --surface2: 240 230 211; --surface3: 228 214 190; --line: 212 196 168;
+  --fg: 13 35 83; --fg2: 60 78 120; --fg3: 88 102 138;
+  --accent: 22 60 142; --accent-fg: 255 255 255; --accent2: 176 128 24; --tint: 232 236 250;
+  --ok: 28 122 72; --warn: 170 108 6; --bad: 190 54 50; --info: 22 60 142;
+  --scrim: 13 35 83 / 0.40;
+}
+/* Royal Night: deep violet + gold */
+:root[data-palette='royal'][data-theme='dark'] {
+  --bg: 32 8 70; --surface: 42 11 90; --surface2: 72 26 130; --surface3: 92 44 154; --line: 120 74 182;
+  --fg: 245 239 251; --fg2: 208 190 232; --fg3: 174 154 204;
+  --accent: 239 211 111; --accent-fg: 42 11 90; --accent2: 248 230 160;
+  --ok: 126 214 160; --warn: 244 196 90; --bad: 246 124 134; --info: 150 176 255;
+  --scrim: 12 2 30 / 0.64;
+}
+:root[data-palette='royal'][data-theme='light'] {
+  --bg: 245 239 251; --surface: 252 249 255; --surface2: 236 226 247; --surface3: 224 210 240; --line: 208 190 230;
+  --fg: 42 11 90; --fg2: 84 58 130; --fg3: 108 84 150;
+  --accent: 72 26 130; --accent-fg: 255 255 255; --accent2: 158 118 8; --tint: 240 230 252;
+  --ok: 28 122 72; --warn: 170 108 6; --bad: 190 54 70; --info: 72 26 130;
+  --scrim: 42 11 90 / 0.40;
+}
+/* Emerald Gold: deep emerald + heritage gold */
+:root[data-palette='emerald'][data-theme='dark'] {
+  --bg: 6 52 46; --surface: 8 69 61; --surface2: 13 106 89; --surface3: 24 130 108; --line: 50 154 128;
+  --fg: 245 240 228; --fg2: 196 224 212; --fg3: 158 196 180;
+  --accent: 227 189 109; --accent-fg: 8 69 61; --accent2: 242 218 160;
+  --ok: 130 226 164; --warn: 244 196 90; --bad: 244 124 116; --info: 140 190 255;
+  --scrim: 2 20 16 / 0.62;
+}
+:root[data-palette='emerald'][data-theme='light'] {
+  --bg: 245 240 228; --surface: 252 249 240; --surface2: 236 230 212; --surface3: 224 216 194; --line: 208 198 170;
+  --fg: 8 69 61; --fg2: 52 98 88; --fg3: 82 120 110;
+  --accent: 13 106 89; --accent-fg: 255 255 255; --accent2: 170 126 28; --tint: 224 240 232;
+  --ok: 13 106 89; --warn: 170 108 6; --bad: 190 54 50; --info: 40 96 180;
+  --scrim: 8 69 61 / 0.40;
+}

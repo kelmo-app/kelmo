@@ -16,6 +16,8 @@ export interface ConfirmRequest {
   cancelLabel?: string;
   tone?: 'danger' | 'default';
   onConfirm: () => void;
+  /** A second, stronger choice shown next to the main one (e.g. "Delete file too"). */
+  alt?: { label: string; onConfirm: () => void };
 }
 
 export interface UiState {
@@ -32,6 +34,9 @@ export interface UiState {
 
   /** One-shot: what to do when every download has finished (not remembered across runs on purpose). */
   afterAll: AfterAllMode;
+  /** A download whose address expired: the next link the browser sends is offered to it first. */
+  linkWaitId: string | null;
+  setLinkWait: (id: string | null) => void;
   setAfterAll: (m: AfterAllMode) => void;
 
   detailId: string | null;
@@ -82,6 +87,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   closeAddDialog: () => set({ addDialog: { open: false } }),
 
   afterAll: 'none',
+  linkWaitId: null,
+  setLinkWait: (linkWaitId) => set({ linkWaitId }),
   setAfterAll: (afterAll) => set({ afterAll }),
 
   detailId: null,

@@ -25,6 +25,13 @@ export const platform = {
     return { ok: res.ok, simulated: false, error: res.error };
   },
 
+  /** Moves downloaded files/folders to the Trash (desktop app only). */
+  async trashFiles(entries: Array<{ dir: string; name: string }>): Promise<{ trashed: number; missing: number; failed: string[] } | null> {
+    const b = bridge();
+    if (!b || !entries.length) return null;
+    try { return await b.trashFiles(entries); } catch { return null; }
+  },
+
   async showInFolder(path: string): Promise<PlatformResult> {
     const b = bridge();
     if (!b) return { ok: true, simulated: true };

@@ -6,13 +6,15 @@ import { useConnectionDetail } from './useConnectionDetail';
 import { usePopupItem } from './usePopupItem';
 
 const PREF = 'kdm:popup:details';
-const HEIGHT = { expanded: 684, collapsed: 500 };
+/** The window is exactly as tall as its content (never taller than the screen), so nothing is cut off and nothing is empty. */
+const MIN_H = 200;
+const maxHeight = () => Math.min(1000, Math.max(320, window.screen.availHeight - 70));
 
 function readPref(): boolean {
   try {
-    return localStorage.getItem(PREF) !== '0';
+    return localStorage.getItem(PREF) === '1';
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -37,11 +39,25 @@ export function ProgressPopup({ id }: { id: string }) {
     document.title = windowTitle(item);
   }, [item]);
 
-  // the window opens big; shrink it at once if the user last chose "Hide details"
+  // fit the window to its content whenever that changes (details, panels, more connections…)
+  const ready = !!item;
   useEffect(() => {
-    if (!showDetails) void api.resize({ height: HEIGHT.collapsed });
+    if (!ready) return;
+    const el = document.querySelector('[data-fit]');
+    if (!el) return;
+    let last = 0;
+    const fit = () => {
+      const want = Math.max(MIN_H, Math.min(Math.ceil(el.getBoundingClientRect().height), maxHeight()));
+      if (Math.abs(want - last) <= 1) return;
+      last = want;
+      void api.resize({ height: want });
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    fit();
+    return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ready]);
 
   if (!item) return <div className="p-6 text-sm text-fg3">Connecting…</div>;
 
@@ -53,7 +69,6 @@ export function ProgressPopup({ id }: { id: string }) {
     } catch {
       /* private mode: just don't remember */
     }
-    void api.resize({ height: next ? HEIGHT.expanded : HEIGHT.collapsed });
   };
 
   const act = (action: ProgressAction, value?: number | string) => {

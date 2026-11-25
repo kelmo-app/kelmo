@@ -35,17 +35,17 @@ export function computeTotals(items: DownloadItem[], now = Date.now()): Totals {
         t.active += 1;
         t.speed += it.speed;
         t.connections += it.connections;
-        t.remainingBytes += it.totalBytes - it.downloadedBytes;
+        t.remainingBytes += Math.max(0, it.totalBytes - it.downloadedBytes);
         t.pendingTotalBytes += it.totalBytes;
         break;
       case 'queued':
         t.queued += 1;
-        t.remainingBytes += it.totalBytes - it.downloadedBytes;
+        t.remainingBytes += Math.max(0, it.totalBytes - it.downloadedBytes);
         t.pendingTotalBytes += it.totalBytes;
         break;
       case 'paused':
         t.paused += 1;
-        t.remainingBytes += it.totalBytes - it.downloadedBytes;
+        t.remainingBytes += Math.max(0, it.totalBytes - it.downloadedBytes);
         t.pendingTotalBytes += it.totalBytes;
         break;
       case 'failed':
@@ -59,7 +59,7 @@ export function computeTotals(items: DownloadItem[], now = Date.now()): Totals {
     }
   }
   if (t.active > 0 && t.speed > 0) {
-    const runningRemaining = items.filter((i) => i.status === 'downloading').reduce((s, i) => s + i.totalBytes - i.downloadedBytes, 0);
+    const runningRemaining = items.filter((i) => i.status === 'downloading').reduce((s, i) => s + Math.max(0, i.totalBytes - i.downloadedBytes), 0);
     t.eta = runningRemaining / t.speed;
   }
   return t;

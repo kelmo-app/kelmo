@@ -5,7 +5,7 @@
  */
 import { useEffect } from 'react';
 import type { DownloadItem } from '@/types';
-import type { PopupConfig } from '@/types/global';
+import type { PopupConfig, UnfinishedItem } from '@/types/global';
 import { CATEGORIES, categoryFolder, normalizeCategory } from '@/lib/url';
 import { popupItems } from '@/popup/popupLogic';
 import { useDownloadStore } from '@/store/instances';
@@ -17,8 +17,9 @@ import { platform } from '@/services/platform';
 
 type After = 'none' | 'file' | 'folder';
 
-export function buildPopupConfig(s: ReturnType<typeof useSettingsStore.getState>['settings'], afterAll: AfterAllMode = 'none'): PopupConfig {
+export function buildPopupConfig(s: ReturnType<typeof useSettingsStore.getState>['settings'], afterAll: AfterAllMode = 'none', extra: { unfinished?: UnfinishedItem[]; waitingId?: string | null } = {}): PopupConfig {
   return {
+    ...extra,
     afterAll,
     categories: CATEGORIES.map((name) => ({ name, folder: categoryFolder(name, s.defaultFolder, s.categoryFolders) })),
     showCompleteDialog: s.showCompleteDialog,
@@ -62,7 +63,13 @@ export function usePopupHost(): void {
           useUiStore.getState().setAfterAll('none');
         }
       }
-      host.publish({ items: popupItems(all, after), config: buildPopupConfig(settings, useUiStore.getState().afterAll), busy });
+      host.publish({ items: popupItems(all, after), config: buildPopupConfig(settings, useUiStore.getState().afterAll, {
+          unfinished: all
+            .filter((i) => ['failed', 'paused', 'cancelled'].includes(i.status) && i.downloadedBytes > 0 && !i.video && !/^magnet:/i.test(i.url))
+            .slice(0, 50)
+            .map((i) => ({ id: i.id, fileName: i.fileName, totalBytes: i.totalBytes, downloadedBytes: i.downloadedBytes, status: i.status })),
+          waitingId: useUiStore.getState().linkWaitId,
+        }), busy });
       if (fire) void host.afterAll(fire);
       for (const it of finished) {
         host.itemDone({ id: it.id, showDialog: settings.showCompleteDialog });
@@ -82,6 +89,19 @@ export function usePopupHost(): void {
       host.on('kdm:popup-add', (spec) => {
         const s = useSettingsStore.getState().settings;
         try {
+          if (spec.replaceId) {
+            // the same file under a new address: continue the partial download instead of adding another one
+            const ok = useDownloadStore.getState().replaceLink(spec.replaceId, { url: spec.url, referrer: spec.referrer, cookie: spec.cookie, userAgent: spec.userAgent });
+            if (useUiStore.getState().linkWaitId === spec.replaceId) useUiStore.getState().setLinkWait(null);
+            flush();
+            if (ok) {
+              host.popupAdded({ id: spec.replaceId, show: s.showProgressWindow });
+              useUiStore.getState().toast({ tone: 'success', title: 'Continuing from where it stopped', description: 'The new address is being used for the same file.' }, 4000);
+              return;
+            }
+            useUiStore.getState().toast({ tone: 'error', title: 'Could not continue that download', description: 'It is no longer waiting. Add the link as a new download instead.' }, 5000);
+            return;
+          }
           const item = useDownloadStore.getState().addDownload({
             url: spec.url,
             fileName: spec.fileName || undefined,
@@ -136,7 +156,7 @@ export function usePopupHost(): void {
       useDownloadStore.subscribe(schedule),
       useSettingsStore.subscribe(schedule),
       useUiStore.subscribe((st, prev) => {
-        if (st.afterAll !== prev.afterAll) schedule();
+        if (st.afterAll !== prev.afterAll || st.linkWaitId !== prev.linkWaitId) schedule();
       }),
     ];
     flush();

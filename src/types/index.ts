@@ -70,10 +70,14 @@ export interface DownloadItem {
   /** Login for the site: user name, and the password sealed by the system keyring (never plain text). */
   authUser?: string;
   authSecret?: string;
+  /** The address was replaced by the person: the engine continues the partial file under the new address. */
+  adoptLink?: boolean;
   /** Set for video-site downloads (YouTube…): quality choice and expected size. */
   video?: { choice: string; size?: number; /** use the browser's login (cookies) for this site */ useLogin?: boolean };
   /** Server supports Range requests (set by the real engine). */
   resumable?: boolean;
+  /** Torrents: path of the biggest file inside the destination folder (what Open plays). */
+  mainFile?: string;
   /** Came from the browser extension: shows the IDM-style progress / complete windows. */
   viaPopup?: boolean;
 }
@@ -121,6 +125,8 @@ export interface ScheduleRule {
 }
 
 export type ThemeMode = 'dark' | 'light' | 'system';
+/** Whole-window colour schemes. "gold" is KELMO's own look (and honours Theme + Accent); the four warm systems (sand, navygold, royal, emerald) follow Theme light/dark; the rest set their own. */
+export type PaletteKey = 'gold' | 'windows' | 'ivory' | 'slate' | 'graphite' | 'clean' | 'sand' | 'navygold' | 'royal' | 'emerald';
 export type AccentKey = 'default' | 'cyan' | 'violet' | 'emerald' | 'amber' | 'rose';
 
 export interface NotificationPrefs {
@@ -163,6 +169,7 @@ export interface BandwidthWindow {
 export interface Settings {
   theme: ThemeMode;
   accentColor: AccentKey;
+  palette: PaletteKey;
   /** Light theme only: colourful washes instead of flat ivory. */
   vibrant: boolean;
   density: 'comfortable' | 'compact';

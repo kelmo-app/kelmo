@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { DownloadItem } from '@/types';
 import { cn } from '@/lib/cn';
-import { formatBytes, formatEta } from '@/lib/format';
+import { formatBytes, formatEta, formatTotal } from '@/lib/format';
 import { useUiStore } from '@/store/uiStore';
 import { CategoryBadge, SpeedBadge, StatusBadge } from '@/components/Badges';
 import { FileTypeIcon } from '@/components/FileTypeIcon';
@@ -19,7 +19,7 @@ export interface DownloadRowProps {
 
 function sizeText(item: DownloadItem): string {
   if (item.status === 'completed') return `${formatBytes(item.totalBytes)}`;
-  return `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`;
+  return `${formatBytes(item.downloadedBytes)} / ${formatTotal(item.totalBytes)}`;
 }
 
 function DownloadRowBase({ item, index, selectable, checked, active, onToggle }: DownloadRowProps) {

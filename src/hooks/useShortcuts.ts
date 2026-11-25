@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDownloadStore } from '@/store/instances';
 import { useUiStore } from '@/store/uiStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { platform } from '@/services/platform';
 
 function isTyping(el: EventTarget | null): boolean {
   const n = el as HTMLElement | null;
@@ -69,29 +70,43 @@ export function useShortcuts(): void {
   }, [navigate]);
 }
 
-/** Remove downloads, honouring the "Confirm before deleting" setting. */
+/** Remove downloads (list only, or list + files in the Trash), honouring the "Confirm before deleting" setting. */
 export function requestRemove(ids: string[], afterRemove?: () => void): void {
   const ui = useUiStore.getState();
   const store = useDownloadStore.getState();
   const items = ids.map((id) => store.items[id]).filter(Boolean);
   if (items.length === 0) return;
-  const run = () => {
+  const run = (alsoFiles: boolean) => {
+    const files = alsoFiles ? items.map((i) => ({ dir: i.destination, name: i.fileName })) : [];
+    const live = items.some((i) => i.status !== 'completed');
     store.removeMany(ids);
     ui.setSelectedIds(ui.selectedIds.filter((x) => !ids.includes(x)));
     if (ui.detailId && ids.includes(ui.detailId)) ui.closeDetail();
     if (ui.activeId && ids.includes(ui.activeId)) ui.setActiveId(null);
     ui.toast({ tone: 'info', title: items.length === 1 ? 'Download removed' : `${items.length} downloads removed`, description: items.length === 1 ? items[0].fileName : undefined }, 2800);
+    if (alsoFiles) {
+      // a running transfer needs a moment to let go of its files before they can be moved
+      window.setTimeout(() => {
+        void platform.trashFiles(files).then((res) => {
+          if (!res) return;
+          const t = useUiStore.getState().toast;
+          if (res.failed.length) t({ tone: 'error', title: 'Some files could not be moved to the Trash', description: res.failed.slice(0, 3).join(', ') }, 5000);
+          else if (res.trashed) t({ tone: 'success', title: res.trashed === 1 ? 'File moved to the Trash' : `${res.trashed} items moved to the Trash`, description: 'You can restore them from the Trash.' }, 3500);
+        });
+      }, live ? 900 : 0);
+    }
     afterRemove?.();
   };
-  if (!useSettingsStore.getState().settings.startupBehavior.confirmBeforeDelete) return run();
+  if (!useSettingsStore.getState().settings.startupBehavior.confirmBeforeDelete) return run(false);
+  const one = items.length === 1;
   ui.askConfirm({
-    title: items.length === 1 ? 'Remove this download?' : `Remove ${items.length} downloads?`,
-    description:
-      items.length === 1
-        ? `“${items[0].fileName}” will be removed from KELMO. Downloaded files stay on disk.`
-        : 'The selected items will be removed from KELMO. Downloaded files stay on disk.',
-    confirmLabel: 'Remove',
+    title: one ? 'Remove this download?' : `Remove ${items.length} downloads?`,
+    description: one
+      ? `“${items[0].fileName}”: remove it from the list only, or also move the downloaded file to the Trash.`
+      : `Remove the ${items.length} selected items from the list only, or also move their downloaded files to the Trash.`,
+    confirmLabel: 'Remove from list',
     tone: 'danger',
-    onConfirm: run,
+    onConfirm: () => run(false),
+    alt: { label: one ? 'Delete file too' : 'Delete files too', onConfirm: () => run(true) },
   });
 }

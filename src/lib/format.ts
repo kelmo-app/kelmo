@@ -6,6 +6,11 @@ export const GB = 1024 * MB;
 export const TB = 1024 * GB;
 
 /** 1_288_490_188 -> "1.2 GB". Uses binary units to match what file managers show. */
+/** A size for places that show "x / total": an unknown total (0) says so instead of "0 B". */
+export function formatTotal(bytes: number): string {
+  return bytes > 0 ? formatBytes(bytes) : 'unknown size';
+}
+
 export function formatBytes(bytes: number, digits = 1): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
   const i = Math.min(UNITS.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));

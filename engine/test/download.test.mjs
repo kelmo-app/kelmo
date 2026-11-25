@@ -79,6 +79,30 @@ test('pause persists state and resume continues without restarting', async () =>
   srv.close();
 });
 
+test('a replaced address continues the partial file (adopt) instead of starting over; without adopt it restarts', async () => {
+  const a = await serve({ perConnBps: 4 * 1024 * 1024 });
+  const dir = tmp();
+  let d = new Download({ url: a.url, dir, connections: 4 });
+  d.start();
+  await new Promise((r) => setTimeout(r, 700));
+  const p1 = done(d); d.pause(); assert.equal(await p1, 'paused');
+  const mid = d.downloaded; assert.ok(mid > 0 && mid < SIZE);
+  a.srv.close();
+  const b = await serve();
+  const dir2 = tmp();
+  fs.cpSync(dir, dir2, { recursive: true });
+  d = new Download({ url: b.url + '?new-session', dir, connections: 4, adopt: true });
+  const p2 = done(d); d.start(); assert.equal(await p2, 'completed');
+  assert.equal(sha(fs.readFileSync(path.join(dir, d.fileName))), sha(DATA));
+  assert.ok(b.stats.bytes < SIZE - mid / 2, `new address sent ${b.stats.bytes} of ${SIZE}: it should only send what was missing`);
+  // not adopted: a different address is a different file as far as the engine knows, so everything is fetched again
+  const c = await serve();
+  const d3 = new Download({ url: c.url + '?other', dir: dir2, connections: 4 });
+  const p3 = done(d3); d3.start(); assert.equal(await p3, 'completed');
+  assert.ok(c.stats.bytes >= SIZE, 'without adopt it restarts');
+  b.srv.close(); c.srv.close();
+});
+
 test('server without range support falls back to a single stream', async () => {
   const { srv, url } = await serve({ ranges: false });
   const dir = tmp(); const d = new Download({ url, dir, connections: 8 });
@@ -297,3 +321,42 @@ test('file allocation: sparse, none and prealloc all produce the same byte-exact
     srv.close();
   }
 });
+
+test('a .torrent link that answers with a web page fails with a clear message and saves nothing', async () => {
+  const srv = http.createServer((_q, res) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end('<html>please log in</html>'); });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdm-html-'));
+  const d = new Download({ url: `http://127.0.0.1:${srv.address().port}/dl/Some.Movie.torrent`, dir, retries: 0 });
+  const states = [];
+  d.on('state', (s) => states.push(s));
+  await d.start();
+  await new Promise((r) => setTimeout(r, 400));
+  srv.close();
+  assert.equal(d.status, 'failed');
+  assert.match(d.error, /web page instead of the \.torrent/i);
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => /torrent/.test(f)), []);
+});
+
+test('a name guessed from the link is replaced by the name the server announces (Google Drive style "download" links)', async () => {
+  const body = Buffer.from('movie-bytes'.repeat(100));
+  const srv = http.createServer((req, res) => {
+    const h = { 'content-disposition': `attachment; filename="x.mkv"; filename*=UTF-8''The%20Odyssey%20(2026).mkv`, 'accept-ranges': 'bytes', 'content-type': 'video/x-matroska' };
+    const m = /bytes=(\d+)-(\d*)/.exec(req.headers.range || '');
+    if (m) { const a = +m[1], b = m[2] ? Math.min(+m[2], body.length - 1) : body.length - 1; res.writeHead(206, { ...h, 'content-range': `bytes ${a}-${b}/${body.length}`, 'content-length': b - a + 1 }); res.end(body.subarray(a, b + 1)); return; }
+    res.writeHead(200, { ...h, 'content-length': body.length }); res.end(body);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdm-name-'));
+  const url = `http://127.0.0.1:${srv.address().port}/download?id=1`;
+  const auto = new Download({ url, dir, fileName: 'download', autoName: true, connections: 1 });
+  await new Promise((r) => { auto.on('state', (s) => s === 'completed' && r()); void auto.start(); });
+  assert.equal(auto.fileName, 'The Odyssey (2026).mkv');
+  assert.ok(fs.existsSync(path.join(dir, 'The Odyssey (2026).mkv')));
+  assert.ok(!fs.existsSync(path.join(dir, 'download')));
+  // a name the person typed is never replaced
+  const mine = new Download({ url, dir, fileName: 'mine.mkv', autoName: false, connections: 1 });
+  await new Promise((r) => { mine.on('state', (s) => s === 'completed' && r()); void mine.start(); });
+  assert.equal(mine.fileName, 'mine.mkv');
+  srv.close();
+});
+

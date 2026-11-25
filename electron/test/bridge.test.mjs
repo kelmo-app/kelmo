@@ -61,3 +61,19 @@ test('/check validates the token; oversized bodies are rejected', async () => {
   assert.ok(big.status === 413 || String(big.status).startsWith('closed'), String(big.status));
 });
 test('after all', () => server.close());
+
+test('prewarm: needs the token, only takes http(s) links, and tells KDM', async () => {
+  const seen = [];
+  const { createRequire } = await import('node:module');
+  const { createBridgeServer } = createRequire(import.meta.url)('../bridge-server.cjs');
+  const server = createBridgeServer({ token: 'tok', version: '1', onAdd: () => {}, onPrewarm: (u) => seen.push(u) });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  const post = (body, token = 'tok') => fetch(`http://127.0.0.1:${port}/prewarm`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kdm-token': token }, body: JSON.stringify(body) });
+  assert.equal((await post({ url: 'https://www.youtube.com/watch?v=abc' }, 'bad')).status, 401);
+  assert.equal((await post({ url: 'file:///etc/passwd' })).status, 400);
+  assert.equal((await post({ url: 'nonsense' })).status, 400);
+  assert.equal((await post({ url: 'https://www.youtube.com/watch?v=abc' })).status, 200);
+  assert.deepEqual(seen, ['https://www.youtube.com/watch?v=abc']);
+  server.close();
+});

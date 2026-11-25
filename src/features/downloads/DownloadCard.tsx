@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { DownloadItem } from '@/types';
 import { cn } from '@/lib/cn';
-import { formatBytes, formatEta } from '@/lib/format';
+import { formatBytes, formatEta, formatTotal } from '@/lib/format';
 import { useUiStore } from '@/store/uiStore';
 import { CategoryBadge, SpeedBadge, StatusBadge } from '@/components/Badges';
 import { FileTypeIcon } from '@/components/FileTypeIcon';
@@ -41,7 +41,7 @@ function DownloadCardBase({ item, checked, active, onToggle }: DownloadCardProps
           {item.fileName}
         </button>
         <p className="tnum mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-fg3">
-          <span>{item.status === 'completed' ? formatBytes(item.totalBytes) : `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`}</span>
+          <span>{item.status === 'completed' ? formatBytes(item.totalBytes) : `${formatBytes(item.downloadedBytes)} / ${formatTotal(item.totalBytes)}`}</span>
           <span aria-hidden>·</span>
           <span>{item.sourceDomain}</span>
         </p>

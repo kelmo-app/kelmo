@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Ban, Copy, FolderOpen, Pause, Play, RotateCw, Trash2 } from 'lucide-react';
 import type { DownloadItem, Priority } from '@/types';
 import { BANDWIDTH_PRESETS } from '@/data/defaults';
-import { formatBytes, formatDateTime, formatDuration, formatEta, formatMBps } from '@/lib/format';
+import { formatBytes, formatTotal, formatDateTime, formatDuration, formatEta, formatMBps } from '@/lib/format';
 import { useDownloadStore } from '@/store/instances';
 import { useUiStore } from '@/store/uiStore';
 import { useItemActions } from '@/hooks/useItemActions';
@@ -60,7 +60,7 @@ function DrawerBody({ item }: { item: DownloadItem }) {
       <div>
         <ProgressBar value={item.progress} status={item.status} size="md" showValue label={`${item.fileName} progress`} />
         <p className="tnum mt-1.5 text-xs text-fg2">
-          {formatBytes(item.downloadedBytes)} of {formatBytes(item.totalBytes)}
+          {formatBytes(item.downloadedBytes)} of {formatTotal(item.totalBytes)}
           {running && ` · ${formatMBps(item.speed)} · ${formatEta(item.eta)} left`}
         </p>
         {item.error && item.status === 'failed' && (

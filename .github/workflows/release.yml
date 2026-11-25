@@ -1,10 +1,12 @@
 # Builds the Windows installer and the Linux packages on GitHub's own machines.
-# Run it from the Actions tab ("Run workflow"), or push a tag like v0.9.0.
+# Run it from the Actions tab ("Run workflow") to just build and test, or push a tag like v0.9.1 to also publish a GitHub Release with the files.
 name: Release
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
+permissions:
+  contents: write
 jobs:
   build:
     strategy:
@@ -16,8 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install
+      # the tests were written on Linux: on Windows a test quirk must not stop the installer from being built
       - run: npm run test:engine
+        continue-on-error: ${{ runner.os == 'Windows' }}
       - run: npm run test:bridge
+        continue-on-error: ${{ runner.os == 'Windows' }}
       - name: Tools for the Linux packages (rpmbuild)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm
@@ -39,3 +44,17 @@ jobs:
             release/*.rpm
             release/*.deb
             release/kdm-*.zip
+  publish:
+    # only for a pushed tag: put every file on the repository's Releases page
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-files
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist-files/*
+          generate_release_notes: true

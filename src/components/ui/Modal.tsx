@@ -12,7 +12,7 @@ export interface ModalProps {
   onClose: () => void;
   title: string;
   description?: string;
-  children: ReactNode;
+  children?: ReactNode;
   footer?: ReactNode;
   /** `drawer` slides in from the right (used for the download detail drawer). */
   variant?: 'center' | 'drawer';
@@ -126,7 +126,7 @@ export function Modal({
             <X size={16} />
           </IconButton>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {children != null && children !== false && <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>}
         {footer && <footer className="flex items-center justify-end gap-2 border-t border-line px-5 py-3.5">{footer}</footer>}
       </div>
     </div>,
